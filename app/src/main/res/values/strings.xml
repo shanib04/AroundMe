@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">AroundMe</string>
     <string name="create_event_page">Create Event Page</string>
+    <string name="event_image_desc">Event image</string>
+    <string name="map_page">Map Page</string>
+    <string name="profile_page">Profile Page</string>
 </resources>
