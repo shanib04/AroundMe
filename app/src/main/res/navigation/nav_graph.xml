@@ -6,22 +6,22 @@
 
     <fragment
         android:id="@+id/feedFragment"
-        android:name="com.colman.aroundme.FeedFragment"
+        android:name="com.colman.aroundme.ui.feed.FeedFragment"
         android:label="Feed" />
 
     <fragment
         android:id="@+id/mapFragment"
-        android:name="com.colman.aroundme.MapFragment"
+        android:name="com.colman.aroundme.ui.map.MapFragment"
         android:label="Map" />
 
     <fragment
         android:id="@+id/createEventFragment"
-        android:name="com.colman.aroundme.CreateEventFragment"
+        android:name="com.colman.aroundme.ui.create.CreateEventFragment"
         android:label="Create Event" />
 
     <fragment
         android:id="@+id/profileFragment"
-        android:name="com.colman.aroundme.ProfileFragment"
+        android:name="com.colman.aroundme.ui.profile.ProfileFragment"
         android:label="Profile" />
 
 </navigation>
