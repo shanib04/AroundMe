@@ -2,22 +2,22 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/navigation_feed"
+        android:id="@+id/feedFragment"
         android:icon="@android:drawable/ic_menu_view"
         android:title="Feed" />
 
     <item
-        android:id="@+id/navigation_map"
+        android:id="@+id/mapFragment"
         android:icon="@android:drawable/ic_menu_mapmode"
         android:title="Map" />
 
     <item
-        android:id="@+id/navigation_create"
+        android:id="@+id/createEventFragment"
         android:icon="@android:drawable/ic_input_add"
         android:title="Add Event" />
 
     <item
-        android:id="@+id/navigation_profile"
+        android:id="@+id/profileFragment"
         android:icon="@android:drawable/ic_menu_myplaces"
         android:title="Profile" />
 
