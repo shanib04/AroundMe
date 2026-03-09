@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/feedFragment">
+
+    <fragment
+        android:id="@+id/feedFragment"
+        android:name="com.colman.aroundme.FeedFragment"
+        android:label="Feed" />
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.colman.aroundme.MapFragment"
+        android:label="Map" />
+
+    <fragment
+        android:id="@+id/createEventFragment"
+        android:name="com.colman.aroundme.CreateEventFragment"
+        android:label="Create Event" />
+
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.colman.aroundme.ProfileFragment"
+        android:label="Profile" />
+
+</navigation>
