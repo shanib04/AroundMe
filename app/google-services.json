@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1089952072285",
+    "project_id": "aroundme-429fa",
+    "storage_bucket": "aroundme-429fa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1089952072285:android:54225f1163f154566a83b4",
+        "android_client_info": {
+          "package_name": "com.colman.aroundme"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1089952072285-fr91pi77lvkqmvrses3r2k4nsn6ejnb4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.colman.aroundme",
+            "certificate_hash": "25ae4ce2c965ad7d273042b951e26b961b69c688"
+          }
+        },
+        {
+          "client_id": "1089952072285-rugtanhf7nrg0k87cimanj30711erjsa.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7mQYfiTloqRMQNtdEvPeYo4L6XrS7c0k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1089952072285-rugtanhf7nrg0k87cimanj30711erjsa.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
