@@ -16,7 +16,6 @@ import com.google.android.material.snackbar.Snackbar
 class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
-    private val binding get() = _binding!!
 
     private val viewModel: ProfileViewModel by viewModels {
         ProfileViewModel.Factory()
@@ -28,7 +27,7 @@ class ProfileFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentProfileBinding.inflate(inflater, container, false)
-        return binding.root
+        return requireNotNull(_binding).root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -38,6 +37,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun observeViewModel() {
+        val binding = _binding ?: return
         viewModel.profileState.observe(viewLifecycleOwner) { state ->
             when (state) {
                 is ProfileUiState.Loading -> renderLoading(true)
@@ -62,6 +62,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun renderProfileImage(imageUrl: String?) {
+        val binding = _binding ?: return
         Glide.with(this).clear(binding.profileImageView)
         val source = imageUrl?.takeIf { it.isNotBlank() }
         Glide.with(this)
@@ -73,6 +74,7 @@ class ProfileFragment : Fragment() {
     }
 
     private fun renderLoading(isLoading: Boolean) {
+        val binding = _binding ?: return
         binding.progressBar.isVisible = isLoading
         binding.profileCard.isVisible = true
     }

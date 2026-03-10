@@ -7,7 +7,6 @@ import android.util.Patterns
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -22,7 +21,6 @@ import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.firestore.FirebaseFirestoreException
 
 /**
  * Login screen for email/password and Google authentication.
@@ -30,7 +28,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = _binding!!
 
     private val viewModel: LoginViewModel by viewModels {
         LoginViewModel.Factory()
@@ -61,7 +58,7 @@ class LoginFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentLoginBinding.inflate(inflater, container, false)
-        return binding.root
+        return requireNotNull(_binding).root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -70,28 +67,31 @@ class LoginFragment : Fragment() {
         observeViewModel()
     }
 
-    private fun setupUi() = with(binding) {
-        loginButton.setOnClickListener {
-            val email = emailEditText.text?.toString().orEmpty()
-            val password = passwordEditText.text?.toString().orEmpty()
+    private fun setupUi() {
+        val binding = _binding ?: return
+        with(binding) {
+            loginButton.setOnClickListener {
+                val email = emailEditText.text?.toString().orEmpty()
+                val password = passwordEditText.text?.toString().orEmpty()
 
-            if (!Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-                emailLayout.error = getString(R.string.invalid_email)
-                return@setOnClickListener
+                if (!Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+                    emailLayout.error = getString(R.string.invalid_email)
+                    return@setOnClickListener
+                }
+
+                emailLayout.error = null
+                passwordLayout.error = null
+                viewModel.loginWithEmailAndPassword(email, password)
             }
 
-            emailLayout.error = null
-            passwordLayout.error = null
-            viewModel.loginWithEmailAndPassword(email, password)
-        }
+            signUpText.setOnClickListener {
+                findNavController().navigate(R.id.action_loginFragment_to_registerFragment)
+            }
 
-        signUpText.setOnClickListener {
-            findNavController().navigate(R.id.action_loginFragment_to_registerFragment)
-        }
-
-        googleButton.setOnClickListener {
-            googleSignInClient.signOut().addOnCompleteListener {
-                googleSignInLauncher.launch(googleSignInClient.signInIntent)
+            googleButton.setOnClickListener {
+                googleSignInClient.signOut().addOnCompleteListener {
+                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                }
             }
         }
     }
@@ -128,13 +128,16 @@ class LoginFragment : Fragment() {
         )
     }
 
-    private fun renderLoading(isLoading: Boolean) = with(binding) {
-        progressBar.isVisible = isLoading
-        loginButton.isEnabled = !isLoading
-        googleButton.isEnabled = !isLoading
-        emailEditText.isEnabled = !isLoading
-        passwordEditText.isEnabled = !isLoading
-        signUpText.isEnabled = !isLoading
+    private fun renderLoading(isLoading: Boolean) {
+        val binding = _binding ?: return
+        with(binding) {
+            progressBar.isVisible = isLoading
+            loginButton.isEnabled = !isLoading
+            googleButton.isEnabled = !isLoading
+            emailEditText.isEnabled = !isLoading
+            passwordEditText.isEnabled = !isLoading
+            signUpText.isEnabled = !isLoading
+        }
     }
 
     private fun configureGoogleSignIn() {
@@ -159,12 +162,11 @@ class LoginFragment : Fragment() {
             viewModel.loginWithGoogle(idToken)
         } catch (exception: ApiException) {
             showMessage(exception.localizedMessage ?: getString(R.string.google_sign_in_failed))
-        } catch (exception: FirebaseFirestoreException) {
-            showMessage(getString(R.string.google_firestore_permission_denied))
         }
     }
 
     private fun showMessage(message: String) {
+        val binding = _binding ?: return
         Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
     }
 

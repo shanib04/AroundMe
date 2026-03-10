@@ -33,7 +33,6 @@ import java.io.FileOutputStream
 class RegisterFragment : Fragment() {
 
     private var _binding: FragmentRegisterBinding? = null
-    private val binding get() = _binding!!
 
     private val viewModel: RegisterViewModel by viewModels {
         RegisterViewModel.Factory(requireActivity().application)
@@ -85,7 +84,7 @@ class RegisterFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentRegisterBinding.inflate(inflater, container, false)
-        return binding.root
+        return requireNotNull(_binding).root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -94,32 +93,36 @@ class RegisterFragment : Fragment() {
         observeViewModel()
     }
 
-    private fun setupUi() = with(binding) {
-        profileImageView.setOnClickListener { showImagePickerOptions() }
-        selectImageButton.setOnClickListener { showImagePickerOptions() }
+    private fun setupUi() {
+        val binding = _binding ?: return
+        with(binding) {
+            profileImageView.setOnClickListener { showImagePickerOptions() }
+            selectImageButton.setOnClickListener { showImagePickerOptions() }
 
-        signUpButton.setOnClickListener {
-            viewModel.register(
-                fullName = fullNameEditText.text?.toString().orEmpty(),
-                email = emailEditText.text?.toString().orEmpty(),
-                password = passwordEditText.text?.toString().orEmpty(),
-                confirmPassword = confirmPasswordEditText.text?.toString().orEmpty(),
-                imageUri = selectedImageUri
-            )
-        }
+            signUpButton.setOnClickListener {
+                viewModel.register(
+                    fullName = fullNameEditText.text?.toString().orEmpty(),
+                    email = emailEditText.text?.toString().orEmpty(),
+                    password = passwordEditText.text?.toString().orEmpty(),
+                    confirmPassword = confirmPasswordEditText.text?.toString().orEmpty(),
+                    imageUri = selectedImageUri
+                )
+            }
 
-        signInText.setOnClickListener {
-            findNavController().navigate(R.id.action_registerFragment_to_loginFragment)
-        }
+            signInText.setOnClickListener {
+                findNavController().navigate(R.id.action_registerFragment_to_loginFragment)
+            }
 
-        googleButton.setOnClickListener {
-            googleSignInClient.signOut().addOnCompleteListener {
-                googleSignInLauncher.launch(googleSignInClient.signInIntent)
+            googleButton.setOnClickListener {
+                googleSignInClient.signOut().addOnCompleteListener {
+                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                }
             }
         }
     }
 
     private fun observeViewModel() {
+        val binding = _binding ?: return
         viewModel.formState.observe(viewLifecycleOwner) { state ->
             binding.fullNameLayout.error = state.fullNameError
             binding.emailLayout.error = state.emailError
@@ -160,17 +163,20 @@ class RegisterFragment : Fragment() {
         )
     }
 
-    private fun renderLoading(isLoading: Boolean) = with(binding) {
-        progressBar.isVisible = isLoading
-        signUpButton.isEnabled = !isLoading
-        googleButton.isEnabled = !isLoading
-        selectImageButton.isEnabled = !isLoading
-        profileImageView.isEnabled = !isLoading
-        fullNameEditText.isEnabled = !isLoading
-        emailEditText.isEnabled = !isLoading
-        passwordEditText.isEnabled = !isLoading
-        confirmPasswordEditText.isEnabled = !isLoading
-        signInText.isEnabled = !isLoading
+    private fun renderLoading(isLoading: Boolean) {
+        val binding = _binding ?: return
+        with(binding) {
+            progressBar.isVisible = isLoading
+            signUpButton.isEnabled = !isLoading
+            googleButton.isEnabled = !isLoading
+            selectImageButton.isEnabled = !isLoading
+            profileImageView.isEnabled = !isLoading
+            fullNameEditText.isEnabled = !isLoading
+            emailEditText.isEnabled = !isLoading
+            passwordEditText.isEnabled = !isLoading
+            confirmPasswordEditText.isEnabled = !isLoading
+            signInText.isEnabled = !isLoading
+        }
     }
 
     private fun showImagePickerOptions() {
@@ -215,6 +221,7 @@ class RegisterFragment : Fragment() {
     }
 
     private fun loadImage(uri: Uri) {
+        val binding = _binding ?: return
         Glide.with(this)
             .load(uri)
             .circleCrop()
@@ -233,6 +240,7 @@ class RegisterFragment : Fragment() {
     }
 
     private fun showMessage(message: String) {
+        val binding = _binding ?: return
         Snackbar.make(binding.root, message, Snackbar.LENGTH_LONG).show()
     }
 
