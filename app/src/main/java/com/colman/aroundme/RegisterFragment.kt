@@ -27,9 +27,9 @@ import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Register screen for email/password and Google sign-up.
- */
+
+// Register screen for email/password and Google sign-up.
+
 class RegisterFragment : Fragment() {
 
     private var _binding: FragmentRegisterBinding? = null

@@ -7,9 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel for loading the current signed-in user's profile.
- */
+// ViewModel for loading the current signed-in user's profile.
 class ProfileViewModel(
     private val authRepository: AuthRepository
 ) : ViewModel() {

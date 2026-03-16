@@ -1,8 +1,6 @@
 package com.colman.aroundme.auth
 
-/**
- * String provider for register validation and error states.
- */
+// String provider for register validation and error states.
 data class RegisterStrings(
     val fullNameRequired: String,
     val emailRequired: String,

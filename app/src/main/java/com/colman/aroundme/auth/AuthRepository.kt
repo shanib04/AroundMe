@@ -14,9 +14,7 @@ import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
 
-/**
- * Repository responsible for Firebase authentication operations.
- */
+// Repository responsible for Firebase authentication operations.
 class AuthRepository(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),

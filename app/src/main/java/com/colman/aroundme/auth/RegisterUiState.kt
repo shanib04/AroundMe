@@ -1,8 +1,6 @@
 package com.colman.aroundme.auth
 
-/**
- * UI state for registration actions.
- */
+// UI state for registration actions.
 sealed class RegisterUiState {
     data object Idle : RegisterUiState()
     data object Loading : RegisterUiState()

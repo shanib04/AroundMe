@@ -1,8 +1,6 @@
 package com.colman.aroundme.auth
 
-/**
- * Field-level validation errors for the register form.
- */
+// Field-level validation errors for the register form.
 data class RegisterFormState(
     val fullNameError: String? = null,
     val emailError: String? = null,

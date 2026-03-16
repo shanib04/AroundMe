@@ -1,8 +1,6 @@
 package com.colman.aroundme.auth
 
-/**
- * Firestore user profile document.
- */
+// Firestore user profile document.
 data class UserProfile(
     val userId: String = "",
     val fullName: String = "",

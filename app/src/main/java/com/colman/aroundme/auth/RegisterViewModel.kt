@@ -12,9 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.R
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel for the register screen.
- */
+// ViewModel for the register screen.
 class RegisterViewModel(
     application: Application,
     private val authRepository: AuthRepository

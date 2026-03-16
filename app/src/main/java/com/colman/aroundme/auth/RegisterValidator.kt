@@ -2,9 +2,7 @@ package com.colman.aroundme.auth
 
 import android.net.Uri
 
-/**
- * Pure validator for register form fields.
- */
+// Pure validator for register form fields.
 class RegisterValidator(
     private val strings: RegisterStrings,
     private val emailMatcher: (String) -> Boolean

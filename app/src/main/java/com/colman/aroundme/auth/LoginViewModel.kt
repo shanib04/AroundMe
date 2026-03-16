@@ -7,9 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
 
-/**
- * ViewModel for the login screen.
- */
+// ViewModel for the login screen.
 class LoginViewModel(
     private val authRepository: AuthRepository
 ) : ViewModel() {

@@ -2,9 +2,7 @@ package com.colman.aroundme.auth
 
 import com.google.firebase.auth.FirebaseUser
 
-/**
- * Represents the UI state for authentication requests.
- */
+// Represents the UI state for authentication requests.
 sealed class AuthResultState {
     data object Idle : AuthResultState()
     data object Loading : AuthResultState()
