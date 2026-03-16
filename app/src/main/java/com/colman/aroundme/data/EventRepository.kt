@@ -67,6 +67,42 @@ class EventRepository {
             category = "Sport"
         ),
         Event(
+            id = "multi_cat_sport_art",
+            title = "Yoga & Painting Retreat",
+            description = "Start with a guided outdoor yoga session, followed by an intuitive canvas painting workshop.",
+            imageUrl = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
+            locationName = "Kefar Sava Green",
+            timeRemaining = "Starts in 1h",
+            tags = listOf("Workshop", "Sport", "Art", "Wellness"),
+            latitude = 32.1720,
+            longitude = 34.9010,
+            category = "Sport" // Primary but testing tags fallback
+        ),
+        Event(
+            id = "unknown_gaming_night",
+            title = "Retro Gaming Tournament",
+            description = "Smash Bros, Mario Kart, and retro arcade cabinets. Bring your own controller!",
+            imageUrl = "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80",
+            locationName = "Tech Hub Lounge",
+            timeRemaining = "Ends in 5h",
+            tags = listOf("Gaming", "Retro", "Tournament", "Social"),
+            latitude = 32.1785,
+            longitude = 34.9150,
+            category = "Gaming" // Unknown category, should fallback to "?" marker
+        ),
+        Event(
+            id = "unknown_then_music",
+            title = "Silent Disco Reading",
+            description = "Grab a headset, read a book, and when the bell rings, the DJ drops a set.",
+            imageUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
+            locationName = "Central Library",
+            timeRemaining = "Starts in 30m",
+            tags = listOf("Reading", "Books", "Music", "Party"),
+            latitude = 32.1840,
+            longitude = 34.9080,
+            category = "Books" // Unknown primary category, but "Music" is in tags! Should show Music marker.
+        ),
+        Event(
             id = "jerusalem_market_live",
             title = "Machane Yehuda Live Market",
             description = "Live music, food tastings, and evening crowds filling the market with energy.",

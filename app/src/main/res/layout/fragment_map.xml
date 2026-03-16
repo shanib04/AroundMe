@@ -7,15 +7,47 @@
     android:background="@color/map_background"
     tools:context=".MapFragment">
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/mapView"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
+    <!-- Deferred Map Container -->
+    <FrameLayout
+        android:id="@+id/mapContainer"
         android:layout_width="0dp"
         android:layout_height="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
+
+    <!-- Loading overlay (Visible by default until map loads) -->
+    <FrameLayout
+        android:id="@+id/loadingOverlay"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#80FFFFFF"
+        android:elevation="10dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:orientation="vertical"
+            android:gravity="center">
+            <ProgressBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminateTint="@color/map_primary" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Loading Map..."
+                android:textColor="@color/map_text_dark"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </FrameLayout>
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/filterCard"
@@ -42,7 +74,7 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/locationInputLayout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/map_location_hint"
@@ -54,7 +86,7 @@
                 app:endIconMode="clear_text"
                 app:startIconDrawable="@drawable/ic_search_area">
 
-                <com.google.android.material.textfield.TextInputEditText
+                <AutoCompleteTextView
                     android:id="@+id/locationEditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -112,23 +144,23 @@
 
                 <TextView
                     android:id="@+id/radiusValueText"
-                    android:layout_width="wrap_content"
+                    android:layout_width="65dp"
                     android:layout_height="wrap_content"
                     android:text="25 km"
                     android:textColor="@color/map_text_muted"
-                    android:textSize="18sp"
+                    android:textSize="16sp"
                     android:textStyle="bold" />
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/radiusSlider"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="14dp"
+                    android:layout_marginStart="4dp"
                     android:layout_weight="1"
-                    android:stepSize="1"
-                    android:value="25"
-                    android:valueFrom="1"
-                    android:valueTo="80"
+                    android:stepSize="0.5"
+                    android:value="25.0"
+                    android:valueFrom="0.5"
+                    android:valueTo="80.0"
                     app:haloColor="@color/map_primary_soft"
                     app:thumbColor="@color/map_primary"
                     app:trackColorActive="@color/map_primary"
@@ -157,24 +189,81 @@
         app:strokeWidth="1dp"
         android:textColor="@color/map_primary" />
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/myLocationButton"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+    <!-- Grouped map controls so they perfectly align and sit right above the event card -->
+    <LinearLayout
+        android:id="@+id/mapControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="216dp"
-        android:insetTop="0dp"
-        android:insetBottom="0dp"
-        app:backgroundTint="@android:color/white"
-        app:cornerRadius="28dp"
-        app:icon="@drawable/ic_my_location"
-        app:iconGravity="textStart"
-        app:iconPadding="0dp"
-        app:iconTint="@color/map_primary"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:strokeColor="@color/map_panel_stroke"
-        app:strokeWidth="1dp" />
+        android:layout_marginBottom="24dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        app:layout_constraintBottom_toTopOf="@id/featuredCard"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/myLocationButton"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:backgroundTint="@android:color/white"
+            app:cornerRadius="28dp"
+            app:icon="@drawable/ic_my_location"
+            app:iconGravity="textStart"
+            app:iconPadding="0dp"
+            app:iconTint="@color/map_primary"
+            app:strokeColor="@color/map_panel_stroke"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="48dp"
+            android:layout_height="96dp"
+            android:layout_marginTop="16dp"
+            app:cardBackgroundColor="@android:color/white"
+            app:cardCornerRadius="24dp"
+            app:cardElevation="2dp"
+            app:strokeColor="@color/map_panel_stroke"
+            app:strokeWidth="1dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/zoomInButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="+"
+                    android:textColor="@color/map_text_dark"
+                    android:textSize="26sp" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/map_panel_stroke" />
+
+                <TextView
+                    android:id="@+id/zoomOutButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center"
+                    android:text="−"
+                    android:textColor="@color/map_text_dark"
+                    android:textSize="26sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+    </LinearLayout>
 
     <include
         android:id="@+id/featuredCard"

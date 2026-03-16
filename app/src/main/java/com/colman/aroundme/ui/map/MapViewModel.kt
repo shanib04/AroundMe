@@ -150,8 +150,8 @@ class MapViewModel(
     companion object {
         val KEFAR_SAVA_CENTER = MapCoordinate(32.1782, 34.9076)
         val JERUSALEM_CENTER = MapCoordinate(31.7780, 35.2217)
-        val DEFAULT_SEARCH_CENTER = JERUSALEM_CENTER
-        const val DEFAULT_SEARCH_LABEL = "Jerusalem"
+        val DEFAULT_SEARCH_CENTER = KEFAR_SAVA_CENTER
+        const val DEFAULT_SEARCH_LABEL = "Kefar Sava"
         const val DEFAULT_RADIUS_KM = 25f
     }
 }
