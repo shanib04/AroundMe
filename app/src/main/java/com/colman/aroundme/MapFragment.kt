@@ -2,16 +2,19 @@ package com.colman.aroundme
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.RectF
 import android.location.Geocoder
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -39,7 +42,6 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -91,11 +93,7 @@ class MapFragment : Fragment() {
 
         setupUI()
 
-        // Wait 150ms to allow the Fragment's enter animation to run smoothly before locking the main thread with Maps setup
-        viewLifecycleOwner.lifecycleScope.launch {
-            delay(150)
-            if (_binding == null) return@launch
-            
+        binding.root.post {
             val mapFragment = SupportMapFragment.newInstance()
             childFragmentManager.beginTransaction()
                 .replace(R.id.mapContainer, mapFragment)
@@ -161,7 +159,6 @@ class MapFragment : Fragment() {
             val eventId = marker.tag as? String
             if (eventId != null) {
                 viewModel.selectEvent(eventId)
-                // Camera will center on the marker inside the observeViewModel block
             } else {
                 marker.showInfoWindow()
             }
@@ -218,25 +215,55 @@ class MapFragment : Fragment() {
             viewModel.updateRadius(value)
         }
         
+        // Navigation button should launch external intent to open maps app (Waze/Google Maps)
         binding.featuredCard.navigateButton.setOnClickListener {
-            viewModel.selectedEvent.value?.id?.let { eventId ->
-                navigateToEventDetails(eventId)
+            viewModel.selectedEvent.value?.let { event ->
+                val gmmIntentUri = android.net.Uri.parse("google.navigation:q=${event.latitude},${event.longitude}")
+                val mapIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, gmmIntentUri)
+                mapIntent.setPackage("com.google.android.apps.maps")
+                try {
+                    startActivity(mapIntent)
+                } catch (e: android.content.ActivityNotFoundException) {
+                    val genericUri = android.net.Uri.parse("geo:${event.latitude},${event.longitude}?q=${event.latitude},${event.longitude}(${android.net.Uri.encode(event.title)})")
+                    val genericIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, genericUri)
+                    try {
+                        startActivity(genericIntent)
+                    } catch (ex: android.content.ActivityNotFoundException) {
+                        Toast.makeText(requireContext(), "No navigation app found", Toast.LENGTH_SHORT).show()
+                    }
+                }
             }
         }
         
+        // Click on root opens the details page
         binding.featuredCard.root.setOnClickListener {
             viewModel.selectedEvent.value?.id?.let { eventId ->
                 navigateToEventDetails(eventId)
             }
         }
 
-        binding.searchLocationButton.setOnClickListener {
-            performSearch()
+        // Trigger search specifically when pressing ENTER on the keyboard
+        binding.locationEditText.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+                performSearch()
+                hideKeyboard()
+                true
+            } else {
+                false
+            }
         }
         
         binding.locationEditText.setOnItemClickListener { _, _, _, _ ->
             performSearch()
+            hideKeyboard()
         }
+    }
+    
+    private fun hideKeyboard() {
+        val view = activity?.currentFocus ?: return
+        val imm = requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(view.windowToken, 0)
+        binding.locationEditText.clearFocus()
     }
     
     private fun performSearch() {
@@ -289,9 +316,9 @@ class MapFragment : Fragment() {
         viewModel.filteredEvents.observe(viewLifecycleOwner) { events ->
             updateMapMarkers(events)
             
-            val suggestions = events.map { it.title } + 
-                              events.map { it.locationName } + 
-                              listOf("Tel Aviv", "Jerusalem", "Kefar Sava", "Haifa")
+            val suggestions = (events.map { it.title } + events.map { it.locationName })
+                .filter { it.length > 3 && !it.matches(Regex("^(.)\\1+$")) } // filter out short garbage like "aaa"
+                .plus(listOf("Tel Aviv", "Jerusalem", "Kefar Sava", "Haifa"))
                               
             val uniqueSuggestions = suggestions.distinct().toTypedArray()
             val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, uniqueSuggestions)
@@ -329,8 +356,9 @@ class MapFragment : Fragment() {
                     .centerCrop()
                     .into(binding.featuredCard.eventImageView)
                 
-                // Add padding so the map centers precisely in the visible space ABOVE the card + buttons
-                googleMap?.setPadding(0, 0, 0, (260 * density).toInt()) 
+                // Add exact padding to place the unpadded center of the map accurately in the visible area.
+                // 150dp bottom padding perfectly balances the visible area above the pop-up card.
+                googleMap?.setPadding(0, 0, 0, (150 * density).toInt()) 
 
                 // Perfectly center the tapped marker considering the newly created space!
                 val position = LatLng(event.latitude, event.longitude)
@@ -363,78 +391,36 @@ class MapFragment : Fragment() {
     private fun getMarkerIcon(event: Event): BitmapDescriptor {
         val eventCategories = listOf(event.category) + event.tags
         
-        val knownIcons = mapOf(
-            "food" to R.drawable.ic_icon_food,
-            "music" to R.drawable.ic_icon_music,
-            "art" to R.drawable.ic_icon_art,
-            "beer" to R.drawable.ic_icon_beer,
-            "sport" to R.drawable.ic_icon_sport
+        val knownCategories = mapOf(
+            "food" to R.drawable.ic_marker_food,
+            "music" to R.drawable.ic_marker_music,
+            "art" to R.drawable.ic_marker_art,
+            "beer" to R.drawable.ic_marker_beer,
+            "sport" to R.drawable.ic_marker_sport
         )
 
-        val knownColors = mapOf(
-            "food" to 0xFFEE7C2B.toInt(),
-            "music" to 0xFFFF6B6B.toInt(),
-            "art" to 0xFF8E7CFF.toInt(),
-            "beer" to 0xFFFFC857.toInt(),
-            "sport" to 0xFF20C997.toInt()
-        )
-
-        // Find the FIRST category tag that actually has a known custom marker
         var primaryCategory = "unknown"
         for (tag in eventCategories) {
             val normalizedTag = tag.trim().lowercase()
-            if (knownIcons.containsKey(normalizedTag)) {
+            if (knownCategories.containsKey(normalizedTag)) {
                 primaryCategory = normalizedTag
                 break
             }
         }
 
-        val drawableRes = knownIcons[primaryCategory] ?: R.drawable.ic_icon_unknown
-        val categoryColor = knownColors[primaryCategory] ?: 0xFF9E9E9E.toInt() // Gray for unknown
-
-        val density = resources.displayMetrics.density
-        // Define dimensions for a map pin shape
-        val width = (42 * density).toInt()
-        val height = (54 * density).toInt() 
-        val iconSize = (20 * density).toInt()
-
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-        val centerX = width / 2f
-        val centerY = width / 2f
-        val radius = width / 2f - 2 * density
-
-        // Draw drop shadow at the bottom
-        paint.color = 0x33000000
-        val shadowRect = RectF(centerX - radius/2, height - 6 * density, centerX + radius/2, height.toFloat())
-        canvas.drawOval(shadowRect, paint)
-
-        // Draw beautiful map pin wrapper (circle + triangle pointing down)
-        val path = android.graphics.Path()
-        path.addCircle(centerX, centerY, radius, android.graphics.Path.Direction.CW)
+        val drawableRes = knownCategories[primaryCategory] ?: R.drawable.ic_marker_unknown
         
-        path.moveTo(centerX - radius * 0.6f, centerY + radius * 0.5f)
-        path.lineTo(centerX, height.toFloat() - 4 * density)
-        path.lineTo(centerX + radius * 0.6f, centerY + radius * 0.5f)
-        path.close()
-
-        paint.color = 0xFFFFFFFF.toInt() // White border
-        canvas.drawPath(path, paint)
-
-        // Inner category color fill
-        paint.color = categoryColor
-        canvas.drawCircle(centerX, centerY, radius - 2 * density, paint)
-
-        // Draw icon in the center
-        val drawable = ContextCompat.getDrawable(requireContext(), drawableRes)
-        if (drawable != null) {
-            val offset = ((width - iconSize) / 2f).toInt()
-            drawable.setBounds(offset, offset, offset + iconSize, offset + iconSize)
-            // No need to tint, icons are already white
-            drawable.draw(canvas)
-        }
+        val drawable = ContextCompat.getDrawable(requireContext(), drawableRes) 
+            ?: return BitmapDescriptorFactory.defaultMarker()
+            
+        val density = resources.displayMetrics.density
+        val targetWidth = (36 * density).toInt()
+        val targetHeight = (44 * density).toInt()
+        
+        val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
 
         return BitmapDescriptorFactory.fromBitmap(bitmap)
     }

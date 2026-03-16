@@ -59,8 +59,7 @@
     <string name="map_radius_km_format">%1$d km</string>
     <string name="map_feature_location_format">%1$s • %2$s</string>
     <string name="map_navigate">Navigate</string>
-    <string name="map_search_button">HIIIIIIIIIII</string>
-    <string name="map_location_hint">aaaaaaa</string>
+    <string name="map_location_hint">Search for event or location</string>
     <string name="event_details_close">Close</string>
     <string name="event_details_live_check">LIVE CHECK</string>
     <string name="event_details_title_placeholder">Is it still happening?</string>

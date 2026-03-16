@@ -91,7 +91,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:imeOptions="actionSearch"
-                    android:inputType="textPostalAddress"
+                    android:inputType="text"
                     android:maxLines="1"
                     tools:text="Jerusalem" />
             </com.google.android.material.textfield.TextInputLayout>
@@ -105,23 +105,11 @@
 
                 <TextView
                     android:id="@+id/currentAreaText"
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
                     android:textColor="@color/map_text_muted"
                     android:textSize="13sp"
                     tools:text="Showing events around Jerusalem" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/searchLocationButton"
-                    style="@style/Widget.Material3.Button.TextButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/map_search_button"
-                    android:textAllCaps="false"
-                    android:textStyle="bold"
-                    app:icon="@drawable/ic_search_area"
-                    app:iconPadding="8dp" />
             </LinearLayout>
 
             <androidx.recyclerview.widget.RecyclerView
