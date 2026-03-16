@@ -42,7 +42,20 @@
     <fragment
         android:id="@+id/mapFragment"
         android:name="com.colman.aroundme.MapFragment"
-        android:label="Map" />
+        android:label="Map">
+        <action
+            android:id="@+id/action_mapFragment_to_eventDetailsFragment"
+            app:destination="@id/eventDetailsFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/eventDetailsFragment"
+        android:name="com.colman.aroundme.EventDetailsFragment"
+        android:label="Event Details">
+        <argument
+            android:name="eventId"
+            app:argType="string" />
+    </fragment>
 
     <fragment
         android:id="@+id/createEventFragment"

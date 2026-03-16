@@ -19,4 +19,20 @@
     <color name="register_input_stroke">#E6EBF1</color>
     <color name="register_hint">#97A6BC</color>
     <color name="register_shadow">#1AEE7C2B</color>
+    <color name="map_background">#F3F4F6</color>
+    <color name="map_primary">#FF6B6B</color>
+    <color name="map_primary_soft">#66FF6B6B</color>
+    <color name="map_secondary">#20C997</color>
+    <color name="map_navy">#0A173E</color>
+    <color name="map_panel_stroke">#E6EAF2</color>
+    <color name="map_track_inactive">#D8DCE3</color>
+    <color name="map_text_dark">#18213A</color>
+    <color name="map_text_muted">#7E8AA7</color>
+    <color name="map_text_light">#A9B3C8</color>
+    <color name="map_heart_tint">#C3CBD8</color>
+    <color name="chip_category_background">#FFF7F7</color>
+    <color name="event_details_title">#27324A</color>
+    <color name="event_details_subtitle">#6E7891</color>
+    <color name="event_positive">#34D16E</color>
+    <color name="event_negative">#FF4757</color>
 </resources>

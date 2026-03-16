@@ -55,4 +55,22 @@
     <string name="profile_not_available">Not available</string>
     <string name="profile_photo_content_description">Profile photo</string>
     <string name="profile_load_error">Could not load profile details.</string>
+    <string name="map_search_this_area">Search this area</string>
+    <string name="map_radius_km_format">%1$d km</string>
+    <string name="map_feature_location_format">%1$s • %2$s</string>
+    <string name="map_navigate">Navigate</string>
+    <string name="map_search_button">HIIIIIIIIIII</string>
+    <string name="map_location_hint">aaaaaaa</string>
+    <string name="event_details_close">Close</string>
+    <string name="event_details_live_check">LIVE CHECK</string>
+    <string name="event_details_title_placeholder">Is it still happening?</string>
+    <string name="event_details_help_text">Help %1$d people know if they should come join the fun!</string>
+    <string name="event_details_still_happening">Still Happening!</string>
+    <string name="event_details_ended">Ended / Inactive</string>
+    <string name="event_details_not_here">I’m not here right now</string>
+    <string name="event_details_vote_live">Thanks for confirming the event is live.</string>
+    <string name="event_details_vote_ended">Thanks for reporting that the event has ended.</string>
+    <string name="event_details_not_found">Event not found.</string>
+    <string name="map_distance_away_format">%.1fkm away</string>
+    <string name="map_navigation_unavailable">No navigation app is available on this device.</string>
 </resources>

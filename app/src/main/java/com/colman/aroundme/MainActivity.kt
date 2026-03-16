@@ -1,6 +1,7 @@
 package com.colman.aroundme
 
 import android.os.Bundle
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.navigation.fragment.NavHostFragment
@@ -22,5 +23,16 @@ class MainActivity : AppCompatActivity() {
         navController.addOnDestinationChangedListener { _, destination, _ ->
             bottomNav.isVisible = destination.id !in authDestinations
         }
+        bottomNav.setOnItemReselectedListener { item ->
+            Log.d(TAG, "bottomNav reselected itemId=${item.itemId}")
+        }
+
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            Log.d(TAG, "destination=${destination.displayName} id=${destination.id}")
+        }
+    }
+
+    companion object {
+        private const val TAG = "AroundMeNav"
     }
 }
