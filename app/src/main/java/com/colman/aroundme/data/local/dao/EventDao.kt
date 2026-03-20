@@ -28,3 +28,4 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE lastUpdated > :since")
     suspend fun getEventsSince(since: Long): List<Event>
 }
+

@@ -31,6 +31,10 @@ class UserRepository private constructor(
         userDao.deleteById(id)
     }
 
+    suspend fun clearAllLocal() {
+        userDao.deleteAll()
+    }
+
     fun syncFromRemote(since: Long = 0L) {
         // Fire-and-forget background sync; simple implementation
         CoroutineScope(Dispatchers.IO).launch {
