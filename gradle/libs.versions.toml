@@ -21,6 +21,10 @@ archCore = "2.2.0"
 mockk = "1.13.12"
 kotlinxCoroutinesTest = "1.10.2"
 glide = "4.16.0"
+coroutines = "1.10.2"
+maps = "19.2.0"
+playServicesLocation = "21.3.0"
+ksp = "2.0.21-1.0.27"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -48,8 +52,13 @@ glide = { group = "com.github.bumptech.glide", name = "glide", version.ref = "gl
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "archCore" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinxCoroutinesTest" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+play-services-maps = { group = "com.google.android.gms", name = "play-services-maps", version.ref = "maps" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+navigation-safeargs-kotlin = { id = "androidx.navigation.safeargs.kotlin", version.ref = "navigationFragmentKtx" }
+google-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

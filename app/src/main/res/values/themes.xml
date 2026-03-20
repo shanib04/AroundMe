@@ -11,4 +11,14 @@
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>
+
+    <style name="ShapeAppearance.AroundMe.ImageCard" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">26dp</item>
+    </style>
+
+    <style name="ShapeAppearance.AroundMe.ImageLarge" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">34dp</item>
+    </style>
 </resources>
