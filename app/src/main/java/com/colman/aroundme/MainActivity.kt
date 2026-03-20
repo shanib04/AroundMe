@@ -2,6 +2,7 @@ package com.colman.aroundme
 
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.bottomnavigation.BottomNavigationView
@@ -16,5 +17,10 @@ class MainActivity : AppCompatActivity() {
         val navController = navHostFragment.navController
         val bottomNav = findViewById<BottomNavigationView>(R.id.bottom_nav)
         bottomNav.setupWithNavController(navController)
+
+        val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            bottomNav.isVisible = destination.id !in authDestinations
+        }
     }
 }
