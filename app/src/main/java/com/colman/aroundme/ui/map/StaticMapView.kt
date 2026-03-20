@@ -10,7 +10,8 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import androidx.core.content.ContextCompat
 import com.colman.aroundme.R
-import com.colman.aroundme.data.Event
+import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.model.MapCoordinate
 import kotlin.math.abs
 import kotlin.math.max
 

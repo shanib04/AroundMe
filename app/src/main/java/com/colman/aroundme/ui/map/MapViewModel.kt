@@ -6,18 +6,19 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
-import com.colman.aroundme.data.Event
-import com.colman.aroundme.data.EventRepository
+import androidx.lifecycle.viewModelScope
+import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.data.repository.EventRepository
+import kotlinx.coroutines.launch
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-class MapViewModel(
-    private val repository: EventRepository
-) : ViewModel() {
+class MapViewModel(private val repository: EventRepository) : ViewModel() {
 
-    private val allEvents = repository.getEvents().asLiveData()
+    private val allEvents = repository.observeAll().asLiveData()
 
     private val _availableFilters = MediatorLiveData<List<String>>()
     val availableFilters: LiveData<List<String>> = _availableFilters
@@ -28,7 +29,7 @@ class MapViewModel(
     private val _radiusKm = MutableLiveData(DEFAULT_RADIUS_KM)
     val radiusKm: LiveData<Float> = _radiusKm
 
-    private val _searchCenter = MutableLiveData(DEFAULT_SEARCH_CENTER)
+    private val _searchCenter = MutableLiveData<MapCoordinate>(DEFAULT_SEARCH_CENTER)
     val searchCenter: LiveData<MapCoordinate> = _searchCenter
 
     private val _searchLocationLabel = MutableLiveData(DEFAULT_SEARCH_LABEL)
@@ -59,6 +60,11 @@ class MapViewModel(
 
         _selectedEvent.addSource(_filteredEvents) { updateSelectedEvent(it) }
         _selectedEvent.addSource(_selectedEventId) { updateSelectedEvent(_filteredEvents.value.orEmpty()) }
+
+        viewModelScope.launch {
+            // trigger initial sync from remote
+            repository.syncFromRemote(0L)
+        }
     }
 
     fun toggleFilter(filter: String) {
@@ -69,22 +75,17 @@ class MapViewModel(
         _selectedFilters.value = updated
     }
 
-    fun updateRadius(radiusKm: Float) {
-        _radiusKm.value = radiusKm
-    }
+    fun updateRadius(radiusKm: Float) { _radiusKm.value = radiusKm }
 
     fun updateSearchArea(center: MapCoordinate, locationLabel: String? = null) {
         _searchCenter.value = center
         _searchLocationLabel.value = locationLabel?.takeIf { it.isNotBlank() } ?: formatCoordinate(center)
     }
 
-    fun selectEvent(eventId: String?) {
-        _selectedEventId.value = eventId
-    }
+    fun selectEvent(eventId: String?) { _selectedEventId.value = eventId }
 
     fun distanceFromCenterKm(event: Event): Double {
-        return distanceKm(
-            _searchCenter.value ?: DEFAULT_SEARCH_CENTER,
+        return distanceKm(_searchCenter.value ?: DEFAULT_SEARCH_CENTER,
             MapCoordinate(event.latitude, event.longitude)
         )
     }
@@ -109,13 +110,15 @@ class MapViewModel(
         val selectedId = _selectedEventId.value
         val selected = events.firstOrNull { it.id == selectedId }
             ?: events.minByOrNull { event ->
-                distanceKm(_searchCenter.value ?: DEFAULT_SEARCH_CENTER, MapCoordinate(event.latitude, event.longitude))
+                distanceKm(_searchCenter.value ?: DEFAULT_SEARCH_CENTER,
+                    MapCoordinate(event.latitude, event.longitude)
+                )
             }
-        
+
         if (_selectedEvent.value != selected) {
             _selectedEvent.value = selected
         }
-        
+
         if (_selectedEventId.value != selected?.id) {
             _selectedEventId.value = selected?.id
         }
@@ -138,9 +141,7 @@ class MapViewModel(
         return "${"%.4f".format(center.latitude)}, ${"%.4f".format(center.longitude)}"
     }
 
-    class Factory(
-        private val repository: EventRepository
-    ) : ViewModelProvider.Factory {
+    class Factory(private val repository: EventRepository) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             return MapViewModel(repository) as T

@@ -6,7 +6,7 @@
 
     <fragment
         android:id="@+id/loginFragment"
-        android:name="com.colman.aroundme.LoginFragment"
+        android:name="com.colman.aroundme.ui.auth.LoginFragment"
         android:label="Login">
         <action
             android:id="@+id/action_loginFragment_to_registerFragment"
@@ -20,7 +20,7 @@
 
     <fragment
         android:id="@+id/registerFragment"
-        android:name="com.colman.aroundme.RegisterFragment"
+        android:name="com.colman.aroundme.ui.auth.RegisterFragment"
         android:label="Register">
         <action
             android:id="@+id/action_registerFragment_to_feedFragment"
@@ -36,12 +36,12 @@
 
     <fragment
         android:id="@+id/feedFragment"
-        android:name="com.colman.aroundme.FeedFragment"
+        android:name="com.colman.aroundme.ui.feed.FeedFragment"
         android:label="Feed" />
 
     <fragment
         android:id="@+id/mapFragment"
-        android:name="com.colman.aroundme.MapFragment"
+        android:name="com.colman.aroundme.ui.map.MapFragment"
         android:label="Map">
         <action
             android:id="@+id/action_mapFragment_to_eventDetailsFragment"
@@ -50,7 +50,7 @@
 
     <fragment
         android:id="@+id/eventDetailsFragment"
-        android:name="com.colman.aroundme.EventDetailsFragment"
+        android:name="com.colman.aroundme.ui.event.EventDetailsFragment"
         android:label="Event Details">
         <argument
             android:name="eventId"
@@ -59,12 +59,12 @@
 
     <fragment
         android:id="@+id/createEventFragment"
-        android:name="com.colman.aroundme.CreateEventFragment"
+        android:name="com.colman.aroundme.ui.event.CreateEventFragment"
         android:label="Create Event" />
 
     <fragment
         android:id="@+id/profileFragment"
-        android:name="com.colman.aroundme.ProfileFragment"
+        android:name="com.colman.aroundme.ui.profile.ProfileFragment"
         android:label="Profile" />
 
 </navigation>

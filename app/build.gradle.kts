@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     id("com.google.gms.google-services")
     id("androidx.navigation.safeargs.kotlin")
+    id("com.google.devtools.ksp")
 }
 
 val localProperties = Properties().apply {
@@ -78,6 +79,11 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.play.services.auth)
     implementation(libs.glide)
+
+    // Room
+    implementation("androidx.room:room-ktx:2.5.2")
+    ksp("androidx.room:room-compiler:2.5.2")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
