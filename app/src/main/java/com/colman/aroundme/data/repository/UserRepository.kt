@@ -20,6 +20,22 @@ class UserRepository private constructor(
 
     fun getUserById(id: String): Flow<User?> = userDao.getUserById(id)
 
+    // Observe a single user by id (flow from Room)
+    fun observeUser(id: String): Flow<User?> = userDao.getUserById(id)
+
+    // Fetch a single user from Firebase and upsert locally (best-effort, non-blocking)
+    fun refreshUserFromRemote(id: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val list = firebase.fetchUsersSince(0L)
+                val found = list.firstOrNull { it.id == id }
+                found?.let { userDao.insert(it) }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+    }
+
     suspend fun upsertUser(user: User, pushToRemote: Boolean = true) {
         userDao.insert(user)
         if (pushToRemote) {

@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.colman.aroundme.data.model.Event
 import kotlinx.coroutines.flow.Flow
+import androidx.lifecycle.LiveData
 
 @Dao
 interface EventDao {
@@ -27,5 +28,8 @@ interface EventDao {
 
     @Query("SELECT * FROM events WHERE lastUpdated > :since")
     suspend fun getEventsSince(since: Long): List<Event>
-}
 
+    // LiveData for events published by a specific user (useful for profile statistics)
+    @Query("SELECT * FROM events WHERE publisherId = :pubId ORDER BY lastUpdated DESC")
+    fun getEventsByPublisher(pubId: String): LiveData<List<Event>>
+}

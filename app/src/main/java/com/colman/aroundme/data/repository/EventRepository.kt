@@ -26,6 +26,9 @@ class EventRepository private constructor(
     // Compatibility method name used by older viewmodels/fragments
     fun getEventById(id: String) = getById(id)
 
+    // Observe events for a specific publisher (LiveData from Room)
+    fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
+
     suspend fun upsertEvent(event: Event, pushToRemote: Boolean = true) {
         eventDao.insert(event)
         if (pushToRemote) {

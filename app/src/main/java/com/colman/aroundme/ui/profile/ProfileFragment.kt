@@ -1,3 +1,4 @@
+@file:Suppress("RedundantQualifierName")
 package com.colman.aroundme.ui.profile
 
 import android.os.Bundle
@@ -12,8 +13,12 @@ import androidx.lifecycle.ViewModelProvider
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.FragmentProfileBinding
-import com.colman.aroundme.ui.auth.ProfileViewModel
+import com.colman.aroundme.ui.profile.ProfileViewModel
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.navigation.fragment.findNavController
+import java.text.NumberFormat
+import android.widget.TextView
 
 class ProfileFragment : Fragment() {
 
@@ -59,11 +64,37 @@ class ProfileFragment : Fragment() {
 
             // Only access binding if inflation succeeded
             if (_binding != null) {
-                binding.editProfileButton.setOnClickListener {
-                    Snackbar.make(binding.root, "Edit profile is not implemented yet", Snackbar.LENGTH_SHORT).show()
+                // Toolbar navigation and menu
+                binding.toolbarProfile.setNavigationOnClickListener { findNavController().popBackStack() }
+                binding.toolbarProfile.inflateMenu(R.menu.menu_profile)
+                binding.toolbarProfile.setOnMenuItemClickListener { item ->
+                    when (item.itemId) {
+                        R.id.action_settings -> {
+                            // Open edit profile screen directly
+                            findNavController().navigate(R.id.action_profileFragment_to_editProfileFragment)
+                            true
+                        }
+                        R.id.action_logout -> {
+                            MaterialAlertDialogBuilder(requireContext())
+                                .setTitle("Logout")
+                                .setMessage("Are you sure you want to logout?")
+                                .setNegativeButton("Cancel", null)
+                                .setPositiveButton("Logout") { _, _ ->
+                                    viewModel.logout { ok ->
+                                        if (ok) {
+                                            val nav = findNavController()
+                                            nav.popBackStack(nav.graph.startDestinationId, false)
+                                            nav.navigate(R.id.loginFragment)
+                                        }
+                                    }
+                                }
+                                .show()
+                            true
+                        }
+                        else -> false
+                    }
                 }
-
-                // radius slider interaction: update label when changed (display-only save not required)
+                // radius slider interaction
                 binding.radiusSlider.addOnChangeListener { _, value, _ ->
                     val km = value.toInt()
                     binding.radiusValueText.text = getString(R.string.map_radius_km_format, km)
@@ -93,20 +124,29 @@ class ProfileFragment : Fragment() {
             b.profileHandleText.text = handle
         }
 
-        viewModel.isValidator.observe(viewLifecycleOwner) { isVal ->
-            b.validatorBadge.isVisible = isVal
+        viewModel.userDegree.observe(viewLifecycleOwner) { degree ->
+            b.userDegreeText.text = degree
+            b.userDegreeText.isVisible = degree.isNotBlank()
         }
 
-        viewModel.eventsCount.observe(viewLifecycleOwner) { count ->
+        viewModel.eventsCreated.observe(viewLifecycleOwner) { count ->
             b.eventsCountText.text = count.toString()
+            val hasPosts = count > 0
+            // show placeholder message when no posts, but always display the points card (green box)
+            b.noPostsPlaceholder.isVisible = !hasPosts
+            b.pointsCard.isVisible = true
         }
 
-        viewModel.validationsCount.observe(viewLifecycleOwner) { count ->
-            b.validationsCountText.text = count.toString()
+        viewModel.totalValidations.observe(viewLifecycleOwner) { total ->
+            b.validationsCountText.text = total.toString()
         }
 
-        viewModel.pointsValue.observe(viewLifecycleOwner) { pts ->
-            b.pointsValueText.text = pts
+        viewModel.influenceScore.observe(viewLifecycleOwner) { inf ->
+            b.influenceText.text = inf
+        }
+
+        viewModel.calculatedPoints.observe(viewLifecycleOwner) { pts ->
+            b.pointsValueText.text = NumberFormat.getIntegerInstance().format(pts)
         }
 
         viewModel.levelLabel.observe(viewLifecycleOwner) { level ->
@@ -118,22 +158,19 @@ class ProfileFragment : Fragment() {
         }
 
         viewModel.achievements.observe(viewLifecycleOwner) { list ->
-            // static layout contains three achievement slots; populate their captions
-            if (list.isNotEmpty()) {
-                val first = list.getOrNull(0) ?: ""
-                val second = list.getOrNull(1) ?: ""
-                val third = list.getOrNull(2) ?: ""
-                // the layout uses children with text labels; find them by traversing the achievementsRow
-                val row = b.achievementsRow
-                if (row.childCount >= 3) {
-                    val a1 = row.getChildAt(0)
-                    val a2 = row.getChildAt(1)
-                    val a3 = row.getChildAt(2)
-                    // each is a LinearLayout with a TextView as the second child
-                    (a1 as? android.view.ViewGroup)?.let { vg -> (vg.getChildAt(1) as? android.widget.TextView)?.text = first }
-                    (a2 as? android.view.ViewGroup)?.let { vg -> (vg.getChildAt(1) as? android.widget.TextView)?.text = second }
-                    (a3 as? android.view.ViewGroup)?.let { vg -> (vg.getChildAt(1) as? android.widget.TextView)?.text = third }
-                }
+            // populate achievement captions safely
+            val l = list ?: emptyList()
+            val first = l.getOrNull(0) ?: ""
+            val second = l.getOrNull(1) ?: ""
+            val third = l.getOrNull(2) ?: ""
+            val row = b.achievementsRow
+            if (row.childCount >= 3) {
+                val a1 = row.getChildAt(0)
+                val a2 = row.getChildAt(1)
+                val a3 = row.getChildAt(2)
+                (a1 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = first }
+                (a2 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = second }
+                (a3 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = third }
             }
         }
 
