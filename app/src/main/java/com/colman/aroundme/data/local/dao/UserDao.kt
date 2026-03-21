@@ -16,6 +16,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     fun getUserById(id: String): Flow<User?>
 
+    @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
+    suspend fun getUserByUsername(username: String): User?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(user: User)
 
@@ -25,4 +28,3 @@ interface UserDao {
     @Query("DELETE FROM users")
     suspend fun deleteAll()
 }
-

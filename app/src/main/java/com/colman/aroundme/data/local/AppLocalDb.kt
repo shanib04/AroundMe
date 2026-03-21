@@ -124,6 +124,9 @@ abstract class AppLocalDb : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 // Add new columns bio and totalPoints to users
                 database.execSQL("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''")
+                // Add username and displayName columns
+                database.execSQL("ALTER TABLE users ADD COLUMN username TEXT DEFAULT ''")
+                database.execSQL("ALTER TABLE users ADD COLUMN displayName TEXT DEFAULT ''")
                 database.execSQL("ALTER TABLE users ADD COLUMN totalPoints INTEGER NOT NULL DEFAULT 0")
             }
         }

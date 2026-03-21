@@ -59,6 +59,26 @@ class FirebaseModel private constructor() {
             .set(user).await()
     }
 
+    // Check if a username exists in Firestore (excluding a specific userId)
+    suspend fun isUsernameTaken(username: String, excludingUserId: String? = null): Boolean {
+        val q = firestore.collection("users").whereEqualTo("username", username).get().await()
+        val docs = q.documents
+        if (docs.isEmpty()) return false
+        if (excludingUserId == null) return docs.isNotEmpty()
+        return docs.any { it.id != excludingUserId }
+    }
+
+    // Delete a user and all events published by that user from Firestore
+    suspend fun deleteUserAndEvents(userId: String) {
+        // delete user doc
+        firestore.collection("users").document(userId).delete().await()
+        // delete events by querying publisherId
+        val events = firestore.collection("events").whereEqualTo("publisherId", userId).get().await()
+        for (doc in events.documents) {
+            firestore.collection("events").document(doc.id).delete().await()
+        }
+    }
+
     suspend fun fetchUsersSince(since: Long): List<User> {
         val snapshot = firestore.collection("users")
             .whereGreaterThan("lastUpdated", since)

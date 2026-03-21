@@ -23,6 +23,8 @@ class UserRepository private constructor(
     // Observe a single user by id (flow from Room)
     fun observeUser(id: String): Flow<User?> = userDao.getUserById(id)
 
+    suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
+
     // Fetch a single user from Firebase and upsert locally (best-effort, non-blocking)
     fun refreshUserFromRemote(id: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -40,6 +42,16 @@ class UserRepository private constructor(
         userDao.insert(user)
         if (pushToRemote) {
             firebase.pushUser(user)
+        }
+    }
+
+    // Check remote Firestore if username is taken (best-effort)
+    suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
+        return try {
+            firebase.isUsernameTaken(username, excludingUserId)
+        } catch (e: Exception) {
+            // On any error, be conservative and report it may be taken to avoid duplicates
+            true
         }
     }
 

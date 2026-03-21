@@ -65,6 +65,15 @@
     <fragment
         android:id="@+id/profileFragment"
         android:name="com.colman.aroundme.ui.profile.ProfileFragment"
-        android:label="Profile" />
+        android:label="Profile">
+        <action
+            android:id="@+id/action_profileFragment_to_editProfileFragment"
+            app:destination="@id/editProfileFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/editProfileFragment"
+        android:name="com.colman.aroundme.ui.profile.EditProfileFragment"
+        android:label="Edit Profile" />
 
 </navigation>

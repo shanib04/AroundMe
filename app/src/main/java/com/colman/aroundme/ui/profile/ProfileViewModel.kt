@@ -44,6 +44,15 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _handle = MutableLiveData<String>("@alex_r")
     val handle: LiveData<String> = _handle
 
+    private val _username = MutableLiveData<String>("")
+    val username: LiveData<String> = _username
+
+    private val _displayName = MutableLiveData<String>("")
+    val displayName: LiveData<String> = _displayName
+
+    private val _bio = MutableLiveData<String>("")
+    val bio: LiveData<String> = _bio
+
     private val _isValidator = MutableLiveData<Boolean>(true)
     val isValidator: LiveData<Boolean> = _isValidator
 
@@ -96,6 +105,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 user?.let {
                     _name.postValue(it.name)
                     _email.postValue(it.email)
+                    _username.postValue(it.username)
+                    _displayName.postValue(it.displayName)
+                    _bio.postValue(it.bio)
                     if (!it.profileImageUrl.isNullOrBlank()) {
                         runCatching { _imageUri.postValue(Uri.parse(it.profileImageUrl)) }
                     }
@@ -139,9 +151,22 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     // helpers
     fun setRadiusKm(value: Int) { _radiusKm.value = value }
 
+    suspend fun isUsernameUnique(candidate: String, currentUserId: String): Boolean {
+        // check local DB first
+        val found = runCatching { userRepo.getUserByUsername(candidate) }.getOrNull()
+        return (found == null) || (found.id == currentUserId)
+    }
+
+    suspend fun isUsernameTakenRemotely(candidate: String, currentUserId: String): Boolean {
+        return userRepo.isUsernameTakenRemote(candidate, currentUserId)
+    }
+
     // Setters for edit screen
     fun setName(value: String) { _name.value = value }
     fun setEmail(value: String) { _email.value = value }
+    fun setUsername(value: String) { _username.value = value }
+    fun setDisplayName(value: String) { _displayName.value = value }
+    fun setBio(value: String) { _bio.value = value }
 
     // Save/logout functions used by edit screen
     fun saveProfile(userId: String, tempImageUri: Uri?, onComplete: (Boolean, String?) -> Unit) {
@@ -162,9 +187,23 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 val updated = User(
                     id = userId,
                     name = _name.value.orEmpty(),
+                    username = _username.value.orEmpty(),
+                    displayName = _displayName.value.orEmpty(),
+                    profileImageUrl = imageUrl,
                     email = _email.value.orEmpty(),
-                    profileImageUrl = imageUrl
+                    bio = _bio.value.orEmpty()
                 )
+
+                // Check remote username uniqueness before pushing
+                val candidate = updated.username
+                if (candidate.isNotBlank()) {
+                    val takenRemote = userRepo.isUsernameTakenRemote(candidate, userId)
+                    if (takenRemote) {
+                        _loading.postValue(false)
+                        onComplete(false, "Username already taken")
+                        return@launch
+                    }
+                }
 
                 userRepo.upsertUser(updated, pushToRemote = true)
 
@@ -215,6 +254,28 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "logout failed", e)
                 onComplete(false)
+            }
+        }
+    }
+
+    fun deleteProfile(userId: String, onComplete: (Boolean, String?) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // delete local events and remote ones
+                eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
+                // delete local user
+                userRepo.deleteUser(userId)
+
+                // attempt to delete remote user doc and events as well (safe-call)
+                runCatching { firebase?.deleteUserAndEvents(userId) }
+
+                // sign out
+                runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() }
+
+                onComplete(true, null)
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "deleteProfile failed", e)
+                onComplete(false, e.localizedMessage ?: "Failed to delete profile")
             }
         }
     }

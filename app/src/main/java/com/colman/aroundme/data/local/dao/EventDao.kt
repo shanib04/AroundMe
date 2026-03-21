@@ -32,4 +32,7 @@ interface EventDao {
     // LiveData for events published by a specific user (useful for profile statistics)
     @Query("SELECT * FROM events WHERE publisherId = :pubId ORDER BY lastUpdated DESC")
     fun getEventsByPublisher(pubId: String): LiveData<List<Event>>
+
+    @Query("DELETE FROM events WHERE publisherId = :pubId")
+    suspend fun deleteEventsByPublisher(pubId: String)
 }

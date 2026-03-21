@@ -7,6 +7,8 @@ import androidx.room.PrimaryKey
 data class User(
     @PrimaryKey val id: String = "", // Firebase Auth UID
     val name: String = "",
+    val username: String = "",
+    val displayName: String = "",
     val profileImageUrl: String = "",
     val email: String = "",
     val bio: String = "",

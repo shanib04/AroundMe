@@ -41,6 +41,17 @@ class EventRepository private constructor(
         // optionally remove from firebase
     }
 
+    suspend fun deleteEventsByPublisher(pubId: String, removeRemote: Boolean = true) {
+        eventDao.deleteEventsByPublisher(pubId)
+        if (removeRemote) {
+            try {
+                firebase.deleteUserAndEvents(pubId)
+            } catch (_: Exception) {
+                // ignore remote failures
+            }
+        }
+    }
+
     fun syncFromRemote(since: Long = 0L) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
