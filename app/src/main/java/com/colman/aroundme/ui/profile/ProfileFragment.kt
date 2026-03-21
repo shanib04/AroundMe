@@ -1,4 +1,3 @@
-@file:Suppress("RedundantQualifierName")
 package com.colman.aroundme.ui.profile
 
 import android.os.Bundle

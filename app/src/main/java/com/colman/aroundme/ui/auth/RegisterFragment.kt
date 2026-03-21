@@ -26,8 +26,7 @@ import com.google.android.material.snackbar.Snackbar
 import java.io.File
 import java.io.FileOutputStream
 
-// Register screen for email/password and Google sign-up.
-
+// Register screen for email/password and Google sign-up
 class RegisterFragment : Fragment() {
 
     private var _binding: FragmentRegisterBinding? = null
@@ -60,7 +59,8 @@ class RegisterFragment : Fragment() {
         }
     }
 
-    private val googleSignInLauncher = registerForActivityResult(
+    // Launcher for GoogleSignIn intent
+    private val googleIntentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode != Activity.RESULT_OK) {
@@ -68,7 +68,7 @@ class RegisterFragment : Fragment() {
             showMessage(getString(R.string.google_sign_up_cancelled))
             return@registerForActivityResult
         }
-        handleGoogleResult(result.data)
+        handleLegacyGoogleSignInResult(result.data)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -112,8 +112,9 @@ class RegisterFragment : Fragment() {
             }
 
             googleButton.setOnClickListener {
-                googleSignInClient.signOut().addOnCompleteListener {
-                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                // Start the Google Sign-In intent
+                googleSignInClient.signInIntent.also { intent ->
+                    googleIntentLauncher.launch(intent)
                 }
             }
         }
@@ -203,18 +204,20 @@ class RegisterFragment : Fragment() {
         googleSignInClient = GoogleSignIn.getClient(requireContext(), options)
     }
 
-    private fun handleGoogleResult(data: Intent?) {
+    private fun handleLegacyGoogleSignInResult(data: Intent?) {
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
             val account = task.getResult(ApiException::class.java)
-            val idToken = account.idToken
+            val idToken = account?.idToken
             if (idToken.isNullOrBlank()) {
                 showMessage(getString(R.string.google_sign_in_token_missing))
                 return
             }
             viewModel.registerWithGoogle(idToken)
-        } catch (exception: ApiException) {
-            showMessage(exception.localizedMessage ?: getString(R.string.google_sign_up_failed))
+        } catch (ex: ApiException) {
+            showMessage(ex.localizedMessage ?: getString(R.string.google_sign_up_failed))
+        } catch (t: Throwable) {
+            showMessage(t.localizedMessage ?: getString(R.string.google_sign_up_failed))
         }
     }
 
@@ -247,4 +250,3 @@ class RegisterFragment : Fragment() {
         _binding = null
     }
 }
-

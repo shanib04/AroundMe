@@ -19,9 +19,10 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 
-// Login screen for email/password and Google authentication.
+// Login screen for email/password and Google authentication
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
@@ -33,16 +34,35 @@ class LoginFragment : Fragment() {
 
     private lateinit var googleSignInClient: GoogleSignInClient
 
-    private val googleSignInLauncher = registerForActivityResult(
+    private val googleIntentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) {
-            viewModel.resetState()
-            showMessage(getString(R.string.google_sign_in_cancelled))
+        val data = result.data
+        if (result.resultCode == Activity.RESULT_OK) {
+            handleLegacyGoogleSignInResult(data)
             return@registerForActivityResult
         }
 
-        handleGoogleSignInResult(result.data)
+        // Try to extract a more helpful error if provided
+        var detailedMessage: String? = null
+        try {
+            if (data != null) {
+                val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+                // force getResult to throw if there's an error
+                task.getResult(ApiException::class.java)
+            }
+        } catch (ae: ApiException) {
+            detailedMessage = ae.localizedMessage
+        } catch (t: Throwable) {
+            detailedMessage = t.localizedMessage
+        }
+
+        viewModel.resetState()
+        if (!detailedMessage.isNullOrBlank()) {
+            showSigninFailedDialog(detailedMessage)
+        } else {
+            showSigninFailedDialog(getString(R.string.google_sign_in_cancelled))
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,9 +107,8 @@ class LoginFragment : Fragment() {
             }
 
             googleButton.setOnClickListener {
-                googleSignInClient.signOut().addOnCompleteListener {
-                    googleSignInLauncher.launch(googleSignInClient.signInIntent)
-                }
+                // Launch the sign-in intent
+                googleIntentLauncher.launch(googleSignInClient.signInIntent)
             }
         }
     }
@@ -138,29 +157,77 @@ class LoginFragment : Fragment() {
         }
     }
 
+    // Configure Google SignIn
     private fun configureGoogleSignIn() {
         val webClientId = getString(R.string.default_web_client_id)
         val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(webClientId)
             .requestEmail()
             .build()
-
         googleSignInClient = GoogleSignIn.getClient(requireContext(), options)
     }
 
-    private fun handleGoogleSignInResult(data: Intent?) {
+    // Handle GoogleSignIn intent result
+    private fun handleLegacyGoogleSignInResult(data: Intent?) {
         val task = GoogleSignIn.getSignedInAccountFromIntent(data)
         try {
             val account = task.getResult(ApiException::class.java)
-            val idToken = account.idToken
+            val idToken = account?.idToken
             if (idToken.isNullOrBlank()) {
                 showMessage(getString(R.string.google_sign_in_token_missing))
                 return
             }
+            // success -> clear flag
             viewModel.loginWithGoogle(idToken)
-        } catch (exception: ApiException) {
-            showMessage(exception.localizedMessage ?: getString(R.string.google_sign_in_failed))
+        } catch (ex: ApiException) {
+            // Developer console / SHA issues manifest as status code 10 (DEVELOPER_ERROR)
+            if (ex.statusCode == 10) {
+                showDeveloperConfigDialog(ex)
+            } else {
+                val msg = ex.localizedMessage ?: getString(R.string.google_sign_in_failed)
+                showMessage(msg)
+            }
+        } catch (t: Throwable) {
+            showMessage(t.localizedMessage ?: getString(R.string.google_sign_in_failed))
         }
+    }
+
+    private fun showDeveloperConfigDialog(ex: ApiException) {
+        val title = getString(R.string.google_sign_in_failed)
+        val msg = ex.localizedMessage ?: "Developer console is not set up correctly."
+        val hint = "Please verify the OAuth client (web client) and SHA-1 keys in the Google Cloud Console for this project.\n\nIf you're testing locally, you can also use email/password login."
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setMessage("$msg\n\n$hint")
+            .setPositiveButton("Retry") { dialog, _ ->
+                dialog.dismiss()
+                googleIntentLauncher.launch(googleSignInClient.signInIntent)
+            }
+            .setNegativeButton("Use email/password") { dialog, _ ->
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showSigninFailedDialog(message: String) {
+        val binding = _binding ?: return
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.google_sign_in_failed))
+            .setMessage(message)
+            .setCancelable(false)
+            .setNegativeButton("Use email/password") { dialog, _ ->
+                dialog.dismiss()
+                val email = binding.emailEditText.text?.toString().orEmpty()
+                val password = binding.passwordEditText.text?.toString().orEmpty()
+                binding.emailEditText.setText(email)
+                binding.passwordEditText.setText(password)
+                viewModel.loginWithEmailAndPassword(email, password)
+            }
+            .setPositiveButton("Retry") { dialog, _ ->
+                dialog.dismiss()
+                googleIntentLauncher.launch(googleSignInClient.signInIntent)
+            }
+            .show()
     }
 
     private fun showMessage(message: String) {

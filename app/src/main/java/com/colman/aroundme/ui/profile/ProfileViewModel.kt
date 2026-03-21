@@ -1,4 +1,3 @@
-@file:Suppress("unused")
 package com.colman.aroundme.ui.profile
 
 import android.app.Application
@@ -282,8 +281,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private fun computeStatsAndPost(list: List<com.colman.aroundme.data.model.Event>) {
         val count = list.size
-        val sumActive = list.sumBy { it.activeVotes }
-        val sumInactive = list.sumBy { it.inactiveVotes }
+        val sumActive = list.sumOf { it.activeVotes }
+        val sumInactive = list.sumOf { it.inactiveVotes }
         val points = (count * 10) + (sumActive * 5) - (sumInactive * 2)
         val influence = if (count > 0) (sumActive.toDouble() / count.toDouble()) else 0.0
 
