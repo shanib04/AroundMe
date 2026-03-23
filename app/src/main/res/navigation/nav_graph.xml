@@ -85,4 +85,9 @@
         android:name="com.colman.aroundme.ui.profile.EditProfileFragment"
         android:label="Edit Profile" />
 
+    <fragment
+        android:id="@+id/myEventsFragment"
+        android:name="com.colman.aroundme.ui.feed.FeedFragment"
+        android:label="My Events" />
+
 </navigation>

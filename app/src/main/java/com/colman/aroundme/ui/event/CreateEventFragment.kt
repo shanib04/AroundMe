@@ -38,18 +38,20 @@ import java.util.Locale
 class CreateEventFragment : Fragment() {
 
     private var _binding: FragmentCreateEventBinding? = null
-    private val binding get() = _binding!!
+    private val binding: FragmentCreateEventBinding
+        get() = requireNotNull(_binding) { "Binding is only valid between onCreateView and onDestroyView." }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var selectedLatitude: Double = 0.0
     private var selectedLongitude: Double = 0.0
     private var selectedGeohash: String = ""
     private var selectedLocationName: String = ""
-    
+
     private val startCalendar = Calendar.getInstance()
-    private val endCalendar = Calendar.getInstance().apply { 
-        add(Calendar.HOUR, 1)
+    private val endCalendar = Calendar.getInstance().apply {
+        timeInMillis = startCalendar.timeInMillis
     }
+    private var isEndManuallySelected = false
 
     private val viewModel: CreateEventViewModel by viewModels {
         CreateEventViewModel.Factory(EventRepository.getInstance(requireContext()))
@@ -98,7 +100,7 @@ class CreateEventFragment : Fragment() {
         observeViewModel()
         updateDateTimeDisplays()
 
-        setFragmentResultListener("location_request") { _, bundle ->
+        childFragmentManager.setFragmentResultListener("location_request", viewLifecycleOwner) { _, bundle ->
             selectedLatitude = bundle.getDouble("latitude")
             selectedLongitude = bundle.getDouble("longitude")
             selectedLocationName = bundle.getString("address", "") ?: "Selected Location"
@@ -137,38 +139,65 @@ class CreateEventFragment : Fragment() {
         }
 
         binding.btnDate.setOnClickListener {
-            showDatePicker { year, month, day ->
+            showDatePicker(startCalendar) { year, month, day ->
                 startCalendar.set(year, month, day)
-                if (endCalendar.before(startCalendar)) {
+                if (!isEndManuallySelected || endCalendar.before(startCalendar)) {
                     endCalendar.timeInMillis = startCalendar.timeInMillis
-                    endCalendar.add(Calendar.HOUR, 1)
-                }
-                updateDateTimeDisplays()
-            }
-        }
-        
-        binding.btnTime.setOnClickListener {
-            showTimePicker { hour, minute ->
-                startCalendar.set(Calendar.HOUR_OF_DAY, hour)
-                startCalendar.set(Calendar.MINUTE, minute)
-                if (endCalendar.before(startCalendar)) {
-                    endCalendar.timeInMillis = startCalendar.timeInMillis
-                    endCalendar.add(Calendar.HOUR, 1)
                 }
                 updateDateTimeDisplays()
             }
         }
 
-        binding.btnEndTime.setOnClickListener {
-            showTimePicker { hour, minute ->
-                val tempCalendar = endCalendar.clone() as Calendar
-                tempCalendar.set(Calendar.HOUR_OF_DAY, hour)
-                tempCalendar.set(Calendar.MINUTE, minute)
-                
+        binding.btnTime.setOnClickListener {
+            showTimePicker(startCalendar) { hour, minute ->
+                startCalendar.set(Calendar.HOUR_OF_DAY, hour)
+                startCalendar.set(Calendar.MINUTE, minute)
+                startCalendar.set(Calendar.SECOND, 0)
+                startCalendar.set(Calendar.MILLISECOND, 0)
+                if (!isEndManuallySelected || endCalendar.before(startCalendar)) {
+                    endCalendar.timeInMillis = startCalendar.timeInMillis
+                }
+                updateDateTimeDisplays()
+            }
+        }
+
+        binding.btnEndDate.setOnClickListener {
+            showDatePicker(endCalendar) { year, month, day ->
+                val tempCalendar = (endCalendar.clone() as Calendar).apply {
+                    set(Calendar.YEAR, year)
+                    set(Calendar.MONTH, month)
+                    set(Calendar.DAY_OF_MONTH, day)
+                }
+
                 if (tempCalendar.before(startCalendar)) {
-                    Toast.makeText(context, "End time must be after start time", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "End time must be after or equal to start time", Toast.LENGTH_SHORT).show()
                 } else {
-                    endCalendar.timeInMillis = tempCalendar.timeInMillis
+                    endCalendar.set(Calendar.YEAR, year)
+                    endCalendar.set(Calendar.MONTH, month)
+                    endCalendar.set(Calendar.DAY_OF_MONTH, day)
+                    isEndManuallySelected = true
+                    updateDateTimeDisplays()
+                }
+            }
+        }
+
+        binding.btnEndTime.setOnClickListener {
+            showTimePicker(endCalendar) { hour, minute ->
+                val tempCalendar = (endCalendar.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, hour)
+                    set(Calendar.MINUTE, minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
+
+                if (tempCalendar.before(startCalendar)) {
+                    Toast.makeText(context, "End time must be after or equal to start time", Toast.LENGTH_SHORT).show()
+                } else {
+                    endCalendar.set(Calendar.HOUR_OF_DAY, hour)
+                    endCalendar.set(Calendar.MINUTE, minute)
+                    endCalendar.set(Calendar.SECOND, 0)
+                    endCalendar.set(Calendar.MILLISECOND, 0)
+                    isEndManuallySelected = true
                     updateDateTimeDisplays()
                 }
             }
@@ -237,28 +266,31 @@ class CreateEventFragment : Fragment() {
     private fun updateDateTimeDisplays() {
         val dateSdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
         val timeSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
-        
+
         binding.btnDate.text = dateSdf.format(startCalendar.time)
         binding.btnTime.text = timeSdf.format(startCalendar.time)
+        binding.btnEndDate.text = dateSdf.format(endCalendar.time)
         binding.btnEndTime.text = timeSdf.format(endCalendar.time)
-
-        val durationMillis = endCalendar.timeInMillis - startCalendar.timeInMillis
-        val threeHoursMillis = 3 * 60 * 60 * 1000
-        binding.tvDurationWarning.isVisible = durationMillis > threeHoursMillis
     }
 
-    private fun showDatePicker(onSelected: (Int, Int, Int) -> Unit) {
-        val calendar = startCalendar
-        DatePickerDialog(requireContext(), { _, year, month, day ->
-            onSelected(year, month, day)
-        }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH)).show()
+    private fun showDatePicker(baseCalendar: Calendar, onSelected: (Int, Int, Int) -> Unit) {
+        DatePickerDialog(
+            requireContext(),
+            { _, year, month, day -> onSelected(year, month, day) },
+            baseCalendar.get(Calendar.YEAR),
+            baseCalendar.get(Calendar.MONTH),
+            baseCalendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
     }
 
-    private fun showTimePicker(onSelected: (Int, Int) -> Unit) {
-        val calendar = Calendar.getInstance()
-        TimePickerDialog(requireContext(), { _, hour, minute ->
-            onSelected(hour, minute)
-        }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show()
+    private fun showTimePicker(baseCalendar: Calendar, onSelected: (Int, Int) -> Unit) {
+        TimePickerDialog(
+            requireContext(),
+            { _, hour, minute -> onSelected(hour, minute) },
+            baseCalendar.get(Calendar.HOUR_OF_DAY),
+            baseCalendar.get(Calendar.MINUTE),
+            true
+        ).show()
     }
 
     private fun showLocationSourceDialog() {
@@ -295,7 +327,7 @@ class CreateEventFragment : Fragment() {
             Toast.makeText(context, "Maximum 5 tags allowed", Toast.LENGTH_SHORT).show()
             return
         }
-        
+
         val tagText = binding.etAddTag.text.toString().trim()
         if (tagText.isNotEmpty()) {
             val formattedTag = tagText.replaceFirstChar { it.uppercase() }
@@ -376,9 +408,9 @@ class CreateEventFragment : Fragment() {
                 selectedLatitude = location.latitude
                 selectedLongitude = location.longitude
                 selectedGeohash = GeoFireUtils.getGeoHashForLocation(GeoLocation(location.latitude, location.longitude))
-                
+
                 binding.tvLocationSubtitle.text = String.format(Locale.getDefault(), "%.4f, %.4f", location.latitude, location.longitude)
-                
+
                 try {
                     val geocoder = Geocoder(requireContext(), Locale.getDefault())
                     val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
