@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            Log.d(TAG, "destination=${destination.displayName} id=${destination.id}")
+            Log.d(TAG, "destinationId=${destination.id}")
         }
     }
 

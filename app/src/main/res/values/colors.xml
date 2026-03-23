@@ -35,4 +35,8 @@
     <color name="event_details_subtitle">#6E7891</color>
     <color name="event_positive">#34D16E</color>
     <color name="event_negative">#FF4757</color>
+    <color name="profile_save">#0B4DA3</color>
+    <color name="profile_delete">#C4303A</color>
+    <color name="profile_button_text">#FFFFFFFF</color>
+    <color name="profile_accent">#3ECF8E</color>
 </resources>
