@@ -60,7 +60,16 @@
     <fragment
         android:id="@+id/createEventFragment"
         android:name="com.colman.aroundme.ui.event.CreateEventFragment"
-        android:label="Create Event" />
+        android:label="Create Event">
+        <action
+            android:id="@+id/action_createEventFragment_to_locationPickerFragment"
+            app:destination="@id/locationPickerFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/locationPickerFragment"
+        android:name="com.colman.aroundme.ui.create.LocationPickerFragment"
+        android:label="Pick Location" />
 
     <fragment
         android:id="@+id/profileFragment"

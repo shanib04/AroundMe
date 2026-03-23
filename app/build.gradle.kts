@@ -17,9 +17,7 @@ val localProperties = Properties().apply {
 
 android {
     namespace = "com.colman.aroundme"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.colman.aroundme"
@@ -30,7 +28,6 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        // Read MAPS_API_KEY from local.properties, provide a fallback to avoid crash
         val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: "YOUR_API_KEY_HERE"
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
@@ -79,6 +76,8 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.play.services.auth)
     implementation(libs.glide)
+    
+    implementation("com.firebase:geofire-android-common:3.2.0")
 
     // Room
     implementation("androidx.room:room-ktx:2.5.2")
