@@ -25,7 +25,7 @@ import java.util.Locale
 class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
     private var _binding: FragmentLocationPickerBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = requireNotNull(_binding) { "FragmentLocationPickerBinding accessed outside of onCreateView/onDestroyView" }
 
     private var googleMap: GoogleMap? = null
     private var selectedLatLng: LatLng? = null

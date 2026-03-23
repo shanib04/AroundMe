@@ -255,9 +255,20 @@ class CreateEventFragment : Fragment() {
 
     private fun launchCamera() {
         try {
-            val photoFile = File(requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES), "IMG_${System.currentTimeMillis()}.jpg")
-            cameraImageUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.fileprovider", photoFile)
-            cameraLauncher.launch(cameraImageUri!!)
+            val photoFile = File(
+                requireContext().getExternalFilesDir(Environment.DIRECTORY_PICTURES),
+                "IMG_${System.currentTimeMillis()}.jpg"
+            )
+            cameraImageUri = FileProvider.getUriForFile(
+                requireContext(),
+                "${requireContext().packageName}.fileprovider",
+                photoFile
+            )
+            cameraImageUri?.let { uri ->
+                cameraLauncher.launch(uri)
+            } ?: run {
+                Toast.makeText(context, "Unable to open camera", Toast.LENGTH_SHORT).show()
+            }
         } catch (e: Exception) {
             Toast.makeText(context, "Error creating image file", Toast.LENGTH_SHORT).show()
         }
