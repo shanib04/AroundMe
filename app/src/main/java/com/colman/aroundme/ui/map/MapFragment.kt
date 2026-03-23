@@ -48,7 +48,7 @@ import kotlinx.coroutines.withContext
 class MapFragment : Fragment() {
 
     private var _binding: FragmentMapBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = requireNotNull(_binding) { "FragmentMapBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: MapViewModel by viewModels {
         MapViewModel.Factory(EventRepository.Companion.getInstance(requireContext()))

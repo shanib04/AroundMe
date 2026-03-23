@@ -27,7 +27,7 @@ import com.colman.aroundme.R
 class EditProfileFragment : Fragment() {
 
     private var _binding: FragmentEditProfileBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = requireNotNull(_binding) { "FragmentEditProfileBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: EditProfileViewModel by viewModels({ requireActivity() })
 
