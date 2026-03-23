@@ -19,7 +19,6 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.setFragmentResultListener
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
@@ -100,14 +99,23 @@ class CreateEventFragment : Fragment() {
         observeViewModel()
         updateDateTimeDisplays()
 
-        childFragmentManager.setFragmentResultListener("location_request", viewLifecycleOwner) { _, bundle ->
+        parentFragmentManager.setFragmentResultListener("location_request", viewLifecycleOwner) { _, bundle ->
             selectedLatitude = bundle.getDouble("latitude")
             selectedLongitude = bundle.getDouble("longitude")
-            selectedLocationName = bundle.getString("address", "") ?: "Selected Location"
-            selectedGeohash = bundle.getString("geohash", "") ?: ""
+            selectedGeohash = bundle.getString("geohash").orEmpty()
+
+            selectedLocationName =
+                bundle.getString("address")?.takeIf { it.isNotBlank() }
+                    ?: bundle.getString("locationName")?.takeIf { it.isNotBlank() }
+                    ?: String.format(Locale.getDefault(), "%.4f, %.4f", selectedLatitude, selectedLongitude)
 
             binding.tvLocationName.text = selectedLocationName
-            binding.tvLocationSubtitle.text = String.format(Locale.getDefault(), "%.4f, %.4f", selectedLatitude, selectedLongitude)
+            binding.tvLocationSubtitle.text = String.format(
+                Locale.getDefault(),
+                "%.4f, %.4f",
+                selectedLatitude,
+                selectedLongitude
+            )
         }
     }
 
