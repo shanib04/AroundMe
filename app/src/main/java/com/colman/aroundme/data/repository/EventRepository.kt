@@ -1,6 +1,7 @@
 package com.colman.aroundme.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.local.dao.EventDao
 import com.colman.aroundme.data.remote.FirebaseModel
@@ -66,7 +67,7 @@ class EventRepository private constructor(
                     eventDao.insert(r)
                 }
             } catch (e: Exception) {
-                // log
+                Log.e(TAG, "syncFromRemote failed", e)
             }
         }
     }
@@ -244,6 +245,7 @@ class EventRepository private constructor(
     companion object {
         @Volatile
         private var INSTANCE: EventRepository? = null
+        private const val TAG = "EventRepository"
 
         fun getInstance(context: Context): EventRepository = INSTANCE ?: synchronized(this) {
             val db = AppLocalDb.getInstance(context)

@@ -22,7 +22,7 @@ import android.widget.TextView
 class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
-    private val binding get() = _binding!!
+    private val binding get() = requireNotNull(_binding) { "FragmentProfileBinding accessed outside of onCreateView/onDestroyView" }
 
     // Create AndroidViewModel using the AndroidViewModelFactory to ensure Application is provided
     private val viewModel: ProfileViewModel by viewModels {
