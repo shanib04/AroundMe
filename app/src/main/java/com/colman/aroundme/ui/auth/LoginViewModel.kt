@@ -16,21 +16,21 @@ class LoginViewModel(
     private val _loginState = MutableLiveData<AuthResultState>(AuthResultState.Idle)
     val loginState: LiveData<AuthResultState> = _loginState
 
-    fun loginWithEmailAndPassword(email: String, password: String) {
-        if (email.isBlank() || password.isBlank()) {
-            _loginState.value = AuthResultState.Error("Email and password are required.")
+    fun loginWithIdentifierAndPassword(identifier: String, password: String) {
+        if (identifier.isBlank() || password.isBlank()) {
+            _loginState.value = AuthResultState.Error("Email/username and password are required.")
             return
         }
 
         _loginState.value = AuthResultState.Loading
         viewModelScope.launch {
-            authRepository.loginWithEmailAndPassword(email.trim(), password)
+            authRepository.loginWithIdentifierAndPassword(identifier.trim(), password)
                 .onSuccess { user ->
                     _loginState.value = AuthResultState.Success(user)
                 }
                 .onFailure { throwable ->
                     _loginState.value = AuthResultState.Error(
-                        throwable.localizedMessage ?: "Unable to sign in with email and password."
+                        throwable.localizedMessage ?: "Unable to sign in."
                     )
                 }
         }

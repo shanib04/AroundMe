@@ -28,21 +28,20 @@ class MainActivity : AppCompatActivity() {
     private fun setupEdgeToEdge() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            
+
             val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
             val currentDestinationId = navHostFragment.navController.currentDestination?.id
-            
+
             val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
-            
+
             if (currentDestinationId in authDestinations) {
-                // Remove all padding for auth screens to allow edge-to-edge backgrounds
                 binding.navHostFragment.updatePadding(top = 0, bottom = 0)
                 binding.bottomNavigationView.updatePadding(bottom = 0)
             } else {
-                binding.navHostFragment.updatePadding(top = systemBars.top, bottom = 80) // Adjust bottom for nav bar
+                binding.navHostFragment.updatePadding(top = systemBars.top, bottom = 80)
                 binding.bottomNavigationView.updatePadding(bottom = systemBars.bottom)
             }
-            
+
             insets
         }
     }
@@ -50,7 +49,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
-        
+
+        // Let NavigationUI handle normal selection for tabs
         binding.bottomNavigationView.setupWithNavController(navController)
 
         binding.fabAdd.setOnClickListener {
@@ -58,23 +58,33 @@ class MainActivity : AppCompatActivity() {
         }
 
         val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
-        
+
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            // Re-trigger inset application when destination changes
             ViewCompat.requestApplyInsets(binding.root)
-            
+
             if (destination.id in authDestinations) {
                 binding.bottomNavigationView.visibility = View.GONE
                 binding.fabAdd.visibility = View.GONE
             } else {
                 binding.bottomNavigationView.visibility = View.VISIBLE
                 binding.fabAdd.visibility = View.VISIBLE
-                
-                if (destination.id == R.id.createEventFragment) {
-                    val menu = binding.bottomNavigationView.menu
-                    for (i in 0 until menu.size()) {
-                        menu.getItem(i).isChecked = false
+
+                val menu = binding.bottomNavigationView.menu
+
+                when (destination.id) {
+                    R.id.feedFragment -> {
+                        // Ensure feed is visually selected when on feed
+                        if (binding.bottomNavigationView.selectedItemId != R.id.feedFragment) {
+                            binding.bottomNavigationView.selectedItemId = R.id.feedFragment
+                        }
                     }
+                    R.id.createEventFragment -> {
+                        // FAB-only screen: clear all tab selection
+                        for (i in 0 until menu.size()) {
+                            menu.getItem(i).isChecked = false
+                        }
+                    }
+                    // For map/profile, setupWithNavController will handle selection
                 }
             }
         }

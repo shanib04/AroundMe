@@ -99,7 +99,8 @@ class RegisterFragment : Fragment() {
 
             signUpButton.setOnClickListener {
                 viewModel.register(
-                    fullName = fullNameEditText.text?.toString().orEmpty(),
+                    displayName = displayNameEditText.text?.toString().orEmpty(),
+                    username = usernameEditText.text?.toString().orEmpty(),
                     email = emailEditText.text?.toString().orEmpty(),
                     password = passwordEditText.text?.toString().orEmpty(),
                     confirmPassword = confirmPasswordEditText.text?.toString().orEmpty(),
@@ -123,7 +124,8 @@ class RegisterFragment : Fragment() {
     private fun observeViewModel() {
         val binding = _binding ?: return
         viewModel.formState.observe(viewLifecycleOwner) { state ->
-            binding.fullNameLayout.error = state.fullNameError
+            binding.displayNameLayout.error = state.displayNameError
+            binding.usernameLayout.error = state.usernameError
             binding.emailLayout.error = state.emailError
             binding.passwordLayout.error = state.passwordError
             binding.confirmPasswordLayout.error = state.confirmPasswordError
@@ -170,7 +172,8 @@ class RegisterFragment : Fragment() {
             googleButton.isEnabled = !isLoading
             selectImageButton.isEnabled = !isLoading
             profileImageView.isEnabled = !isLoading
-            fullNameEditText.isEnabled = !isLoading
+            displayNameEditText.isEnabled = !isLoading
+            usernameEditText.isEnabled = !isLoading
             emailEditText.isEnabled = !isLoading
             passwordEditText.isEnabled = !isLoading
             confirmPasswordEditText.isEnabled = !isLoading

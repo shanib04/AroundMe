@@ -92,4 +92,7 @@
     <string name="events_count_placeholder">12</string>
     <string name="validations_count_placeholder">45</string>
     <string name="view_all">View all</string>
+    <string name="email_or_username_hint">Email or Username</string>
+    <string name="display_name_label">Display Name</string>
+    <string name="username_label">Username</string>
 </resources>

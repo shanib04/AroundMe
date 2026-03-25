@@ -33,10 +33,6 @@ class RegisterViewModel(
         googleAccountMissing = getString(R.string.error_google_account_missing)
     )
 
-    private val validator = RegisterValidator(strings) { email ->
-        Patterns.EMAIL_ADDRESS.matcher(email).matches()
-    }
-
     private val _registerState = MutableLiveData<RegisterUiState>(RegisterUiState.Idle)
     val registerState: LiveData<RegisterUiState> = _registerState
 
@@ -44,13 +40,14 @@ class RegisterViewModel(
     val formState: LiveData<RegisterFormState> = _formState
 
     fun register(
-        fullName: String,
+        displayName: String,
+        username: String,
         email: String,
         password: String,
         confirmPassword: String,
         imageUri: Uri?
     ) {
-        val validationResult = validateInputs(fullName, email, password, confirmPassword, imageUri)
+        val validationResult = validateInputs(displayName, username, email, password, confirmPassword, imageUri)
         _formState.value = validationResult.formState
         if (!validationResult.formState.isValid) {
             return
@@ -59,10 +56,11 @@ class RegisterViewModel(
         _registerState.value = RegisterUiState.Loading
         viewModelScope.launch {
             authRepository.registerWithEmailAndPassword(
-                fullName = validationResult.sanitizedFullName,
-                email = validationResult.sanitizedEmail,
-                password = validationResult.sanitizedPassword,
-                imageUri = imageUri
+                validationResult.sanitizedDisplayName,
+                validationResult.sanitizedUsername,
+                validationResult.sanitizedEmail,
+                validationResult.sanitizedPassword,
+                imageUri
             ).onSuccess { profile ->
                 _registerState.value = RegisterUiState.Success(profile)
             }.onFailure { throwable ->
@@ -106,18 +104,79 @@ class RegisterViewModel(
     }
 
     internal fun validateInputs(
-        fullName: String,
+        displayName: String,
+        username: String,
         email: String,
         password: String,
         confirmPassword: String,
         imageUri: Uri?
-    ): RegisterValidationResult = validator.validate(
-        fullName = fullName,
-        email = email,
-        password = password,
-        confirmPassword = confirmPassword,
-        imageUri = imageUri
-    )
+    ): RegisterValidationResult {
+        val trimmedDisplayName = displayName.trim()
+        val trimmedUsername = username.trim().lowercase()
+        val trimmedEmail = email.trim()
+
+        var displayNameError: String? = null
+        var usernameError: String? = null
+        var emailError: String? = null
+        var passwordError: String? = null
+        var confirmPasswordError: String? = null
+        var profileImageError: String? = null
+
+        val usernameRegex = Regex("^[a-z0-9_]{3,15}$")
+        val displayNameRegex = Regex("^[a-zA-Z0-9_\\- ]{1,20}$")
+
+        if (trimmedDisplayName.isBlank()) {
+            displayNameError = "Display name is required."
+        } else if (!displayNameRegex.matches(trimmedDisplayName)) {
+            displayNameError = "Display name can contain letters, numbers, spaces, '-' and '_' (max 20)."
+        }
+
+        if (trimmedUsername.isBlank()) {
+            usernameError = "Username is required."
+        } else if (!usernameRegex.matches(trimmedUsername)) {
+            usernameError = "Username can only contain lowercase letters, numbers, and underscores (3-15 chars)."
+        }
+
+        if (trimmedEmail.isBlank()) {
+            emailError = strings.emailRequired
+        } else if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+            emailError = strings.invalidEmail
+        }
+
+        if (password.isBlank()) {
+            passwordError = strings.passwordRequired
+        } else if (password.length < 6) {
+            passwordError = strings.passwordTooShort
+        }
+
+        if (confirmPassword.isBlank()) {
+            confirmPasswordError = strings.confirmPasswordRequired
+        } else if (password != confirmPassword) {
+            confirmPasswordError = strings.passwordMismatch
+        }
+
+        // Profile image is now optional: no error if null
+        if (imageUri == null) {
+            profileImageError = null
+        }
+
+        val formState = RegisterFormState(
+            displayNameError = displayNameError,
+            usernameError = usernameError,
+            emailError = emailError,
+            passwordError = passwordError,
+            confirmPasswordError = confirmPasswordError,
+            profileImageError = profileImageError
+        )
+
+        return RegisterValidationResult(
+            formState = formState,
+            sanitizedDisplayName = trimmedDisplayName,
+            sanitizedUsername = trimmedUsername,
+            sanitizedEmail = trimmedEmail,
+            sanitizedPassword = password
+        )
+    }
 
     private fun getString(resId: Int): String = getApplication<Application>().getString(resId)
 
