@@ -20,6 +20,9 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
 
     private val allEvents = repository.observeAll().asLiveData()
 
+    // Expose a snapshot of all events (unfiltered) for global event search
+    fun allEventsSnapshot(): List<Event> = allEvents.value.orEmpty()
+
     private val _availableFilters = MediatorLiveData<List<String>>()
     val availableFilters: LiveData<List<String>> = _availableFilters
 
@@ -96,13 +99,14 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
         val center = _searchCenter.value ?: DEFAULT_SEARCH_CENTER
         val radius = _radiusKm.value ?: DEFAULT_RADIUS_KM
 
+        val now = System.currentTimeMillis()
         _filteredEvents.value = events.filter { event ->
             val eventFilters = (listOf(event.category) + event.tags)
                 .map { it.trim().lowercase() }
                 .toSet()
             val matchesFilters = selectedFilters.isEmpty() || selectedFilters.any(eventFilters::contains)
             val withinRadius = distanceKm(center, MapCoordinate(event.latitude, event.longitude)) <= radius
-            matchesFilters && withinRadius
+            matchesFilters && withinRadius && !event.isEnded
         }
     }
 

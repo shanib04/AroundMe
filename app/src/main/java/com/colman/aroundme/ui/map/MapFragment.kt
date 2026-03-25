@@ -17,6 +17,7 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -42,6 +43,7 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -51,7 +53,7 @@ class MapFragment : Fragment() {
     private val binding get() = requireNotNull(_binding) { "FragmentMapBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: MapViewModel by viewModels {
-        MapViewModel.Factory(EventRepository.Companion.getInstance(requireContext()))
+        MapViewModel.Factory(EventRepository.getInstance(requireContext()))
     }
 
     private lateinit var categoryAdapter: CategoryFilterAdapter
@@ -59,6 +61,8 @@ class MapFragment : Fragment() {
     private val activeMarkers = mutableMapOf<String, Marker>()
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private var geocoderJob: Job? = null
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -69,8 +73,8 @@ class MapFragment : Fragment() {
                 enableMyLocation()
             }
             else -> {
-                moveToLocation(MapViewModel.Companion.KEFAR_SAVA_CENTER, 15f)
-                viewModel.updateSearchArea(MapViewModel.Companion.KEFAR_SAVA_CENTER, "Kefar Sava")
+                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, 15f)
+                viewModel.updateSearchArea(MapViewModel.KEFAR_SAVA_CENTER, "Kefar Sava")
             }
         }
     }
@@ -128,8 +132,8 @@ class MapFragment : Fragment() {
                 moveToLocation(userLocation, 15f)
                 viewModel.updateSearchArea(userLocation, "Current Location")
             } else {
-                moveToLocation(MapViewModel.Companion.KEFAR_SAVA_CENTER, 15f)
-                viewModel.updateSearchArea(MapViewModel.Companion.KEFAR_SAVA_CENTER, "Kefar Sava")
+                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, 15f)
+                viewModel.updateSearchArea(MapViewModel.KEFAR_SAVA_CENTER, "Kefar Sava")
             }
         }
     }
@@ -244,21 +248,122 @@ class MapFragment : Fragment() {
             }
         }
 
-        // Trigger search specifically when pressing ENTER on the keyboard
+        // Combined suggestions: events + addresses
+        binding.locationEditText.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString()?.trim().orEmpty()
+                if (query.length < 3) {
+                    binding.locationEditText.dismissDropDown()
+                    return
+                }
+
+                val allEvents = viewModel.allEventsSnapshot()
+                val matchingEvents = allEvents.filter { event ->
+                    event.title.contains(query, ignoreCase = true) ||
+                    event.locationName.contains(query, ignoreCase = true)
+                }
+
+                // Build event suggestions first
+                val suggestionItems = mutableListOf<SuggestionItem>()
+                matchingEvents.forEach { event ->
+                    suggestionItems += SuggestionItem.EventSuggestion(
+                        displayText = "${event.title} • ${event.locationName}",
+                        event = event
+                    )
+                }
+
+                // Then start address suggestions via Geocoder
+                geocoderJob?.cancel()
+                geocoderJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    val geocoderSuggestions = try {
+                        val geocoder = Geocoder(requireContext())
+                        @Suppress("DEPRECATION")
+                        val results = geocoder.getFromLocationName(query, 5)
+                        results?.mapNotNull { address ->
+                            val line = address.getAddressLine(0) ?: return@mapNotNull null
+                            SuggestionItem.AddressSuggestion(
+                                displayText = line,
+                                latitude = address.latitude,
+                                longitude = address.longitude,
+                                label = address.locality ?: address.featureName ?: line
+                            )
+                        } ?: emptyList()
+                    } catch (_: Exception) {
+                        emptyList()
+                    }
+
+                    val combined = (suggestionItems + geocoderSuggestions).take(10)
+                    if (combined.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            val adapter = object : ArrayAdapter<String>(
+                                requireContext(),
+                                android.R.layout.simple_dropdown_item_1line,
+                                combined.map { item ->
+                                    when (item) {
+                                        is SuggestionItem.EventSuggestion -> "${item.displayText}  (event)"
+                                        is SuggestionItem.AddressSuggestion -> "${item.displayText}  (address)"
+                                    }
+                                }
+                            ) {}
+
+                            binding.locationEditText.setTag(R.id.locationEditText, combined)
+                            val auto = binding.locationEditText as AutoCompleteTextView
+                            auto.setAdapter(adapter)
+                            auto.showDropDown()
+                        }
+                    }
+                }
+            }
+        })
+
+        (binding.locationEditText as AutoCompleteTextView).setOnItemClickListener { _, _, position, _ ->
+            @Suppress("UNCHECKED_CAST")
+            val items = binding.locationEditText.getTag(R.id.locationEditText) as? List<SuggestionItem>
+                ?: return@setOnItemClickListener
+            val item = items.getOrNull(position) ?: return@setOnItemClickListener
+
+            when (item) {
+                is SuggestionItem.EventSuggestion -> {
+                    val event = item.event
+                    val center = MapCoordinate(event.latitude, event.longitude)
+                    viewModel.updateSearchArea(center, event.locationName)
+                    moveToLocation(center, 15f)
+                    viewModel.selectEvent(event.id)
+                    binding.searchAreaButton.visibility = View.GONE
+                }
+                is SuggestionItem.AddressSuggestion -> {
+                    val center = MapCoordinate(item.latitude, item.longitude)
+                    viewModel.updateSearchArea(center, item.label)
+                    moveToLocation(center, 15f)
+                    binding.searchAreaButton.visibility = View.GONE
+                }
+            }
+
+            hideKeyboard()
+        }
+
         binding.locationEditText.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-                performSearch()
+                performSearch(binding.locationEditText.text.toString())
                 hideKeyboard()
                 true
             } else {
                 false
             }
         }
+    }
 
-        binding.locationEditText.setOnItemClickListener { _, _, _, _ ->
-            performSearch()
-            hideKeyboard()
-        }
+    private sealed class SuggestionItem {
+        data class EventSuggestion(val displayText: String, val event: Event) : SuggestionItem()
+        data class AddressSuggestion(
+            val displayText: String,
+            val latitude: Double,
+            val longitude: Double,
+            val label: String
+        ) : SuggestionItem()
     }
 
     private fun hideKeyboard() {
@@ -268,8 +373,10 @@ class MapFragment : Fragment() {
         binding.locationEditText.clearFocus()
     }
 
-    private fun performSearch() {
-        val query = binding.locationEditText.text.toString().trim()
+    private fun performSearch(rawQuery: String? = null) {
+        val query = rawQuery?.trim().orEmpty().ifEmpty {
+            binding.locationEditText.text.toString().trim()
+        }
         if (query.isNotBlank()) {
             val matchingEvent = viewModel.filteredEvents.value?.firstOrNull {
                 it.title.contains(query, ignoreCase = true) ||
@@ -285,7 +392,7 @@ class MapFragment : Fragment() {
                 return
             }
 
-            lifecycleScope.launch(Dispatchers.IO) {
+            viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
                 try {
                     val geocoder = Geocoder(requireContext())
                     @Suppress("DEPRECATION")
@@ -310,7 +417,7 @@ class MapFragment : Fragment() {
                             ).show()
                         }
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(
                             requireContext(),
@@ -322,6 +429,7 @@ class MapFragment : Fragment() {
             }
         }
     }
+
 
     private fun observeViewModel() {
         if (googleMap == null) return
@@ -447,5 +555,6 @@ class MapFragment : Fragment() {
         _binding = null
         googleMap = null
         activeMarkers.clear()
+        geocoderJob?.cancel()
     }
 }
