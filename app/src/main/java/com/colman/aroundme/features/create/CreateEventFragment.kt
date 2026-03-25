@@ -85,6 +85,11 @@ class CreateEventFragment : Fragment() {
         }
     }
 
+    private val eventMode: String
+        get() = arguments?.getString("mode") ?: "create"
+    private val sourceEventId: String?
+        get() = arguments?.getString("eventId")
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCreateEventBinding.inflate(inflater, container, false)
         return binding.root
@@ -118,6 +123,10 @@ class CreateEventFragment : Fragment() {
                 selectedLatitude,
                 selectedLongitude
             )
+        }
+
+        if (!sourceEventId.isNullOrBlank()) {
+            viewModel.loadEvent(requireNotNull(sourceEventId))
         }
     }
 
@@ -235,7 +244,9 @@ class CreateEventFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            viewModel.createEvent(
+            viewModel.saveEvent(
+                mode = eventMode,
+                existingEventId = sourceEventId,
                 title = title,
                 description = description,
                 locationName = selectedLocationName,
@@ -415,6 +426,30 @@ class CreateEventFragment : Fragment() {
                     binding.btnPublish.isEnabled = true
                 }
             }
+        }
+
+        viewModel.editingEvent.observe(viewLifecycleOwner) { event ->
+            val currentEvent = event ?: return@observe
+            binding.etEventTitle.setText(currentEvent.title)
+            binding.etEventDescription.setText(currentEvent.description)
+            binding.actvCategory.setText(currentEvent.category, false)
+            selectedLatitude = currentEvent.latitude
+            selectedLongitude = currentEvent.longitude
+            selectedGeohash = currentEvent.geohash
+            selectedLocationName = currentEvent.locationName
+            binding.tvLocationName.text = currentEvent.locationName
+            binding.tvLocationSubtitle.text = String.format(Locale.getDefault(), "%.4f, %.4f", currentEvent.latitude, currentEvent.longitude)
+            startCalendar.timeInMillis = if (eventMode == "recreate") System.currentTimeMillis() else currentEvent.publishTime
+            endCalendar.timeInMillis = if (currentEvent.expirationTime > 0L && eventMode != "recreate") currentEvent.expirationTime else startCalendar.timeInMillis
+            hasExpirationTime = currentEvent.expirationTime > 0L && eventMode != "recreate"
+            binding.switchEndTime.isChecked = hasExpirationTime
+            binding.groupEndTime.isVisible = hasExpirationTime
+            updateDateTimeDisplays()
+            if (currentEvent.imageUrl.isNotBlank() && viewModel.selectedImageUri.value == null) {
+                binding.placeholderContainer.isVisible = false
+                Glide.with(this).load(currentEvent.imageUrl).centerCrop().into(binding.ivEventImage)
+            }
+            binding.btnPublish.text = if (eventMode == "edit") getString(R.string.my_events_edit) else getString(R.string.my_events_recreate)
         }
     }
 

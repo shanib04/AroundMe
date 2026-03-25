@@ -123,4 +123,8 @@
     <string name="event_rating_empty">No ratings yet</string>
     <string name="event_rating_star_content_description">Rate %1$d stars</string>
     <string name="feed_rating_content_description">Average rating</string>
+    <string name="my_events_title">My Events</string>
+    <string name="my_events_empty">You haven’t created any events yet.</string>
+    <string name="my_events_edit">Edit Event</string>
+    <string name="my_events_recreate">Recreate Event</string>
 </resources>

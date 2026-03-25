@@ -91,7 +91,7 @@
 
     <fragment
         android:id="@+id/myEventsFragment"
-        android:name="com.colman.aroundme.features.feed.FeedFragment"
+        android:name="com.colman.aroundme.features.feed.MyEventsFragment"
         android:label="My Events" />
 
 </navigation>
