@@ -74,7 +74,7 @@
     <string name="map_navigation_unavailable">No navigation app is available on this device.</string>
     <string name="community_validator_label">COMMUNITY VALIDATOR</string>
     <string name="profile_name_placeholder">Alex Rivera</string>
-    <string name="profile_handle_placeholder">@alex_r</string>
+    <string name="profile_handle_placeholder">\@alex_r</string>
     <string name="level_label">LEVEL 5</string>
     <string name="points_word">points</string>
     <string name="current_label">Current</string>
@@ -95,4 +95,13 @@
     <string name="email_or_username_hint">Email or Username</string>
     <string name="display_name_label">Display Name</string>
     <string name="username_label">Username</string>
+    <string name="feed_sort_label">Sort: Trending</string>
+    <string name="feed_subtitle">Fresh local moments, picked from your latest events.</string>
+    <string name="feed_empty_state_title">No live events yet</string>
+    <string name="feed_empty_state_description">Your first event card will appear here as soon as something is shared nearby.</string>
+    <string name="feed_empty_state_subtitle">Start sharing events to build your feed.</string>
+    <string name="feed_empty_state_status">Coming soon</string>
+    <string name="feed_empty_state_posted">POSTED JUST NOW</string>
+    <string name="feed_more">More</string>
+    <string name="feed_share">Share</string>
 </resources>

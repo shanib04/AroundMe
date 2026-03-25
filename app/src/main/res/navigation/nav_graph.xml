@@ -37,7 +37,11 @@
     <fragment
         android:id="@+id/feedFragment"
         android:name="com.colman.aroundme.ui.feed.FeedFragment"
-        android:label="Feed" />
+        android:label="Feed">
+        <action
+            android:id="@+id/action_feedFragment_to_eventDetailsFragment"
+            app:destination="@id/eventDetailsFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/mapFragment"
