@@ -100,13 +100,14 @@
                         app:strokeWidth="3dp" />
                 </FrameLayout>
 
+                <!-- Display Name -->
                 <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/fullNameLayout"
+                    android:id="@+id/displayNameLayout"
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
-                    android:hint="@string/full_name_label"
+                    android:hint="@string/display_name_label"
                     app:boxBackgroundColor="@android:color/white"
                     app:boxCornerRadiusBottomEnd="22dp"
                     app:boxCornerRadiusBottomStart="22dp"
@@ -119,12 +120,44 @@
                     app:hintTextColor="@color/register_text_primary">
 
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/fullNameEditText"
+                        android:id="@+id/displayNameEditText"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:imeOptions="actionNext"
                         android:inputType="textPersonName"
                         android:minHeight="54dp"
+                        android:maxLength="20"
+                        android:textColor="@color/register_text_primary"
+                        android:textColorHint="@color/register_hint" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Username -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/usernameLayout"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:hint="@string/username_label"
+                    app:boxBackgroundColor="@android:color/white"
+                    app:boxCornerRadiusBottomEnd="22dp"
+                    app:boxCornerRadiusBottomStart="22dp"
+                    app:boxCornerRadiusTopEnd="22dp"
+                    app:boxCornerRadiusTopStart="22dp"
+                    app:boxStrokeColor="@color/register_input_stroke"
+                    app:boxStrokeErrorColor="@color/register_primary"
+                    app:boxStrokeWidth="1dp"
+                    app:boxStrokeWidthFocused="2dp"
+                    app:hintTextColor="@color/register_text_primary">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/usernameEditText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:imeOptions="actionNext"
+                        android:inputType="textNoSuggestions|textVisiblePassword"
+                        android:minHeight="54dp"
+                        android:maxLength="15"
                         android:textColor="@color/register_text_primary"
                         android:textColorHint="@color/register_hint" />
                 </com.google.android.material.textfield.TextInputLayout>

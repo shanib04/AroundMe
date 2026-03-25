@@ -3,6 +3,7 @@ package com.colman.aroundme.data.repository
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.model.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -42,14 +43,28 @@ class AuthRepository(
     }
 
     suspend fun registerWithEmailAndPassword(
-        fullName: String,
+        displayName: String,
+        username: String,
         email: String,
         password: String,
         imageUri: Uri?
     ): Result<UserProfile> = runCatching {
+        val normalizedUsername = username.lowercase()
+
+        // 1) Ensure username is unique in Firestore
+        val existing = firestore.collection(USERS_COLLECTION)
+            .whereEqualTo("username", normalizedUsername)
+            .get()
+            .await()
+        if (!existing.isEmpty) {
+            error("Username is already taken")
+        }
+
+        // 2) Create Auth user
         val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val user = authResult.user ?: error("Registration succeeded, but no user data was returned.")
 
+        // 3) Upload profile image if provided
         var persistedImageSource = ""
         if (imageUri != null) {
             runCatching {
@@ -62,22 +77,69 @@ class AuthRepository(
             }
         }
 
+        // 4) Update Firebase Auth profile for convenience
         runCatching {
-            updateFirebaseUserProfile(user, fullName, persistedImageSource)
+            updateFirebaseUserProfile(user, displayName, persistedImageSource)
         }
 
+        // 5) Build and persist Firestore/Room user document
+        val userDoc = User(
+            id = user.uid,
+            name = displayName,
+            username = normalizedUsername,
+            displayName = displayName,
+            profileImageUrl = persistedImageSource,
+            email = email
+        )
+
+        runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .document(user.uid)
+                .set(userDoc)
+                .await()
+        }
+
+        // 6) Maintain existing UserProfile shape for rest of app
         val profile = UserProfile(
             userId = user.uid,
-            fullName = fullName,
+            fullName = displayName,
             email = email,
             imageUrl = persistedImageSource
         )
 
-        runCatching {
-            saveUserProfile(profile)
-        }
-
         mergeProfiles(profile, buildFallbackProfile(user.reloadAndReturnCurrent(), persistedImageSource))
+    }
+
+    suspend fun loginWithIdentifierAndPassword(
+        identifier: String,
+        password: String
+    ): Result<FirebaseUser> = runCatching {
+        val trimmed = identifier.trim()
+        if (trimmed.contains("@")) {
+            // Treat as email
+            val authResult = firebaseAuth.signInWithEmailAndPassword(trimmed, password).await()
+            authResult.user ?: error("Login succeeded, but no user data was returned.")
+        } else {
+            // Treat as username: resolve to email via Firestore
+            val normalizedUsername = trimmed.lowercase()
+            val snapshot = firestore.collection(USERS_COLLECTION)
+                .whereEqualTo("username", normalizedUsername)
+                .get()
+                .await()
+
+            if (snapshot.isEmpty) {
+                error("Username not found")
+            }
+
+            val doc = snapshot.documents.first()
+            val email = doc.getString("email").orEmpty()
+            if (email.isBlank()) {
+                error("Username not found")
+            }
+
+            val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
+            authResult.user ?: error("Login succeeded, but no user data was returned.")
+        }
     }
 
     suspend fun signInWithGoogleAndSyncProfile(idToken: String): Result<UserProfile> = runCatching {

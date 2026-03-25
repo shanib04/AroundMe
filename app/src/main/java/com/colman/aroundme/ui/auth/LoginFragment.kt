@@ -89,17 +89,13 @@ class LoginFragment : Fragment() {
         val binding = _binding ?: return
         with(binding) {
             loginButton.setOnClickListener {
-                val email = emailEditText.text?.toString().orEmpty()
+                val identifier = emailEditText.text?.toString().orEmpty()
                 val password = passwordEditText.text?.toString().orEmpty()
-
-                if (!Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-                    emailLayout.error = getString(R.string.invalid_email)
-                    return@setOnClickListener
-                }
 
                 emailLayout.error = null
                 passwordLayout.error = null
-                viewModel.loginWithEmailAndPassword(email, password)
+
+                viewModel.loginWithIdentifierAndPassword(identifier, password)
             }
 
             signUpText.setOnClickListener {
@@ -217,11 +213,9 @@ class LoginFragment : Fragment() {
             .setCancelable(false)
             .setNegativeButton("Use email/password") { dialog, _ ->
                 dialog.dismiss()
-                val email = binding.emailEditText.text?.toString().orEmpty()
+                val identifier = binding.emailEditText.text?.toString().orEmpty()
                 val password = binding.passwordEditText.text?.toString().orEmpty()
-                binding.emailEditText.setText(email)
-                binding.passwordEditText.setText(password)
-                viewModel.loginWithEmailAndPassword(email, password)
+                viewModel.loginWithIdentifierAndPassword(identifier, password)
             }
             .setPositiveButton("Retry") { dialog, _ ->
                 dialog.dismiss()

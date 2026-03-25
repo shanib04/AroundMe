@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupNavigation() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
-        
+
         binding.bottomNavigationView.setupWithNavController(navController)
 
         binding.fabAdd.setOnClickListener {
@@ -58,22 +58,42 @@ class MainActivity : AppCompatActivity() {
         }
 
         val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
-        
+
         navController.addOnDestinationChangedListener { _, destination, _ ->
             // Re-trigger inset application when destination changes
             ViewCompat.requestApplyInsets(binding.root)
-            
+
             if (destination.id in authDestinations) {
                 binding.bottomNavigationView.visibility = View.GONE
                 binding.fabAdd.visibility = View.GONE
             } else {
                 binding.bottomNavigationView.visibility = View.VISIBLE
                 binding.fabAdd.visibility = View.VISIBLE
-                
-                if (destination.id == R.id.createEventFragment) {
-                    val menu = binding.bottomNavigationView.menu
-                    for (i in 0 until menu.size()) {
-                        menu.getItem(i).isChecked = false
+
+                val menu = binding.bottomNavigationView.menu
+
+                when (destination.id) {
+                    R.id.feedFragment -> {
+                        // Explicitly select the feed tab when on the feed
+                        if (binding.bottomNavigationView.selectedItemId != R.id.feedFragment) {
+                            binding.bottomNavigationView.selectedItemId = R.id.feedFragment
+                        }
+                    }
+                    R.id.mapFragment -> {
+                        if (binding.bottomNavigationView.selectedItemId != R.id.mapFragment) {
+                            binding.bottomNavigationView.selectedItemId = R.id.mapFragment
+                        }
+                    }
+                    R.id.profileFragment -> {
+                        if (binding.bottomNavigationView.selectedItemId != R.id.profileFragment) {
+                            binding.bottomNavigationView.selectedItemId = R.id.profileFragment
+                        }
+                    }
+                    R.id.createEventFragment -> {
+                        // For the FAB-only screen, clear selection so no tab appears active
+                        for (i in 0 until menu.size()) {
+                            menu.getItem(i).isChecked = false
+                        }
                     }
                 }
             }
