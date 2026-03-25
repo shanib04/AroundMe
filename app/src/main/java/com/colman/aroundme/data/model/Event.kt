@@ -22,4 +22,7 @@ data class Event(
     val activeVotes: Int = 0,
     val inactiveVotes: Int = 0,
     val lastUpdated: Long = System.currentTimeMillis()
-)
+) {
+    val isEnded: Boolean
+        get() = expirationTime != 0L && System.currentTimeMillis() > expirationTime
+}

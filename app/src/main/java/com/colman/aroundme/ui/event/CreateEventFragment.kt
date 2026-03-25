@@ -29,6 +29,7 @@ import com.firebase.geofire.GeoFireUtils
 import com.firebase.geofire.GeoLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.material.switchmaterial.SwitchMaterial
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -45,12 +46,13 @@ class CreateEventFragment : Fragment() {
     private var selectedLongitude: Double = 0.0
     private var selectedGeohash: String = ""
     private var selectedLocationName: String = ""
+    private var isEndManuallySelected = false
+    private var hasExpirationTime = false
 
     private val startCalendar = Calendar.getInstance()
     private val endCalendar = Calendar.getInstance().apply {
         timeInMillis = startCalendar.timeInMillis
     }
-    private var isEndManuallySelected = false
 
     private val viewModel: CreateEventViewModel by viewModels {
         CreateEventViewModel.Factory(EventRepository.getInstance(requireContext()))
@@ -224,6 +226,10 @@ class CreateEventFragment : Fragment() {
                 binding.actvCategory.error = "Category is required"
                 return@setOnClickListener
             }
+            if (viewModel.selectedImageUri.value == null) {
+                Toast.makeText(context, "An image is required for the event", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             if (selectedLocationName.isEmpty()) {
                 Toast.makeText(context, "Please select a location", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
@@ -239,9 +245,18 @@ class CreateEventFragment : Fragment() {
                 category = category,
                 tags = viewModel.tags.value ?: emptyList(),
                 publishTime = startCalendar.timeInMillis,
-                expirationTime = endCalendar.timeInMillis,
+                expirationTime = if (hasExpirationTime) endCalendar.timeInMillis else 0L,
                 imageUri = viewModel.selectedImageUri.value
             )
+        }
+
+        // Initially hide end time controls
+        binding.groupEndTime.visibility = View.GONE
+
+        // Toggle for enabling/disabling end time
+        binding.switchEndTime.setOnCheckedChangeListener { _, isChecked: Boolean ->
+            hasExpirationTime = isChecked
+            binding.groupEndTime.visibility = if (isChecked) View.VISIBLE else View.GONE
         }
     }
 

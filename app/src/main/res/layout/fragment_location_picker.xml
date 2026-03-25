@@ -37,7 +37,7 @@
                 android:src="@drawable/ic_search_area"
                 app:tint="@color/text_light" />
 
-            <EditText
+            <AutoCompleteTextView
                 android:id="@+id/etSearch"
                 android:layout_width="0dp"
                 android:layout_height="56dp"

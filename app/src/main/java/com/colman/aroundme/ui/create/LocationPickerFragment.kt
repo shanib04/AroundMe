@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
@@ -21,6 +23,11 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import java.util.Locale
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
@@ -29,6 +36,7 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
     private var googleMap: GoogleMap? = null
     private var selectedLatLng: LatLng? = null
+    private var geocoderJob: Job? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentLocationPickerBinding.inflate(inflater, container, false)
@@ -69,6 +77,49 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
             } else {
                 false
             }
+        }
+
+        // As-you-type suggestions for location search
+        binding.etSearch.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString()?.trim().orEmpty()
+                if (query.length < 3) return
+
+                geocoderJob?.cancel()
+                geocoderJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    try {
+                        val geocoder = Geocoder(requireContext(), Locale.getDefault())
+                        @Suppress("DEPRECATION")
+                        val results = geocoder.getFromLocationName(query, 5)
+                        val suggestions = results?.mapNotNull { it.getAddressLine(0) } ?: emptyList()
+
+                        if (suggestions.isNotEmpty()) {
+                            withContext(Dispatchers.Main) {
+                                val adapter = ArrayAdapter(
+                                    requireContext(),
+                                    android.R.layout.simple_dropdown_item_1line,
+                                    suggestions
+                                )
+                                val autoComplete = binding.etSearch as AutoCompleteTextView
+                                autoComplete.setAdapter(adapter)
+                                autoComplete.showDropDown()
+                            }
+                        }
+                    } catch (_: Exception) {
+                        // ignore
+                    }
+                }
+            }
+        })
+
+        (binding.etSearch as AutoCompleteTextView).setOnItemClickListener { _, _, position, _ ->
+            val adapter = (binding.etSearch as AutoCompleteTextView).adapter as? ArrayAdapter<String>
+                ?: return@setOnItemClickListener
+            val selected = adapter.getItem(position) ?: return@setOnItemClickListener
+            searchLocation(selected)
         }
     }
 
@@ -123,6 +174,7 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        geocoderJob?.cancel()
         _binding = null
     }
 }
