@@ -6,22 +6,26 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.colman.aroundme.data.local.dao.EventDao
+import com.colman.aroundme.data.local.dao.EventInteractionDao
 import com.colman.aroundme.data.local.dao.UserDao
 import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.model.EventInteraction
+import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.User
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import androidx.room.TypeConverter
 
 @Database(
-    entities = [User::class, Event::class],
-    version = 3,
+    entities = [User::class, Event::class, EventInteraction::class],
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppLocalDb : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun eventDao(): EventDao
+    abstract fun eventInteractionDao(): EventInteractionDao
 
     companion object {
         @Volatile
@@ -131,6 +135,26 @@ abstract class AppLocalDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE events ADD COLUMN averageRating REAL NOT NULL DEFAULT 0.0")
+                database.execSQL("ALTER TABLE events ADD COLUMN ratingCount INTEGER NOT NULL DEFAULT 0")
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS event_interactions (
+                        eventId TEXT NOT NULL,
+                        actorId TEXT NOT NULL,
+                        voteType TEXT,
+                        rating INTEGER NOT NULL,
+                        lastUpdated INTEGER NOT NULL,
+                        PRIMARY KEY(eventId, actorId)
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_event_interactions_eventId ON event_interactions(eventId)")
+            }
+        }
+
         fun getInstance(context: Context): AppLocalDb {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -138,7 +162,7 @@ abstract class AppLocalDb : RoomDatabase() {
                     AppLocalDb::class.java,
                     "aroundme_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance
@@ -159,4 +183,12 @@ object Converters {
     fun listToString(list: List<String>?): String {
         return list?.joinToString(separator = "||") ?: ""
     }
+
+    @TypeConverter
+    @JvmStatic
+    fun fromVoteType(value: EventVoteType?): String? = value?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toVoteType(value: String?): EventVoteType? = value?.let(EventVoteType::valueOf)
 }

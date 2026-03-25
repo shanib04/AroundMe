@@ -62,4 +62,9 @@
     <color name="profile_delete">#C4303A</color>
     <color name="profile_button_text">#FFFFFFFF</color>
     <color name="profile_accent">#3ECF8E</color>
+
+    <!-- Feed Chips -->
+    <color name="feed_chip_blue_bg">#E9FBFF</color>
+    <color name="feed_chip_orange_bg">#FFF3E2</color>
+    <color name="feed_chip_red_bg">#FFECEF</color>
 </resources>

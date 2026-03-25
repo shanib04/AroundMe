@@ -4,8 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.local.dao.EventDao
-import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.local.dao.EventInteractionDao
 import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.model.EventInteraction
+import com.colman.aroundme.data.model.EventVoteType
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +18,9 @@ import kotlinx.coroutines.launch
 // Repository pattern for Event data
 class EventRepository private constructor(
     private val eventDao: EventDao,
-    private val firebase: FirebaseModel
+    private val eventInteractionDao: EventInteractionDao,
+    private val firebase: FirebaseModel,
+    private val identityRepository: IdentityRepository
 ) {
 
     init {
@@ -242,6 +247,67 @@ class EventRepository private constructor(
         }
     }
 
+    fun observeInteraction(eventId: String) =
+        eventInteractionDao.observeInteraction(eventId, identityRepository.getActorId())
+
+    suspend fun getInteraction(eventId: String): EventInteraction? {
+        return eventInteractionDao.getInteraction(eventId, identityRepository.getActorId())
+    }
+
+    suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = voteType,
+            rating = existingInteraction?.rating ?: 0,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+        return recalculateEventAggregates(currentEvent)
+    }
+
+    suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {
+        val normalizedRating = rating.coerceIn(1, 5)
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = existingInteraction?.voteType,
+            rating = normalizedRating,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+        recalculateEventAggregates(currentEvent)
+        return updatedInteraction
+    }
+
+    private suspend fun recalculateEventAggregates(event: Event): Event {
+        val interactions = eventInteractionDao.getInteractionsForEvent(event.id)
+        val activeVotes = interactions.count { it.voteType == EventVoteType.ACTIVE }
+        val inactiveVotes = interactions.count { it.voteType == EventVoteType.INACTIVE }
+        val ratings = interactions.map { it.rating }.filter { it > 0 }
+        val updatedEvent = event.copy(
+            activeVotes = activeVotes,
+            inactiveVotes = inactiveVotes,
+            averageRating = if (ratings.isEmpty()) 0.0 else ratings.average(),
+            ratingCount = ratings.size,
+            lastUpdated = System.currentTimeMillis()
+        )
+
+        eventDao.insert(updatedEvent)
+        try {
+            firebase.pushEvent(updatedEvent)
+        } catch (e: Exception) {
+            Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
+        }
+        return updatedEvent
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: EventRepository? = null
@@ -249,7 +315,12 @@ class EventRepository private constructor(
 
         fun getInstance(context: Context): EventRepository = INSTANCE ?: synchronized(this) {
             val db = AppLocalDb.getInstance(context)
-            val repo = EventRepository(db.eventDao(), FirebaseModel.getInstance())
+            val repo = EventRepository(
+                eventDao = db.eventDao(),
+                eventInteractionDao = db.eventInteractionDao(),
+                firebase = FirebaseModel.getInstance(),
+                identityRepository = IdentityRepository(context)
+            )
             INSTANCE = repo
             repo
         }

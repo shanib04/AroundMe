@@ -72,10 +72,36 @@
                 app:tint="@color/text_light" />
         </LinearLayout>
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:contentDescription="@string/feed_distance_icon_content_description"
+                android:src="@drawable/ic_location_small"
+                app:tint="@color/text_light" />
+
+            <TextView
+                android:id="@+id/locationText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_light"
+                android:textSize="13sp"
+                tools:text="Kefar Sava Park" />
+        </LinearLayout>
+
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="310dp"
-            android:layout_marginTop="12dp">
+            android:layout_marginTop="10dp">
 
             <com.google.android.material.imageview.ShapeableImageView
                 android:id="@+id/eventImageView"
@@ -97,11 +123,11 @@
                 android:gravity="center"
                 android:minHeight="34dp"
                 android:paddingHorizontal="10dp"
-                android:textColor="@android:color/white"
+                android:textColor="@android:color/black"
                 android:textSize="14sp"
                 android:textStyle="bold"
                 app:drawableStartCompat="@drawable/ic_location_small"
-                app:drawableTint="@android:color/white"
+                app:drawableTint="@android:color/black"
                 tools:text="0.5km" />
 
             <TextView
@@ -115,7 +141,7 @@
                 android:gravity="center"
                 android:minHeight="34dp"
                 android:paddingHorizontal="12dp"
-                android:textColor="@android:color/white"
+                android:textColor="@android:color/black"
                 android:textSize="13sp"
                 android:textStyle="bold"
                 tools:text="Ends in 2h" />
@@ -129,7 +155,7 @@
             android:ellipsize="end"
             android:maxLines="2"
             android:textColor="@color/text_dark"
-            android:textSize="32sp"
+            android:textSize="26sp"
             android:textStyle="bold"
             tools:text="Underground Art Fair" />
 
@@ -139,10 +165,10 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:ellipsize="end"
-            android:maxLines="3"
+            android:maxLines="2"
             android:textColor="@color/text_light"
-            android:textSize="16sp"
-            tools:text="An impromptu gathering of local street artists showing off their latest mural work. Live music." />
+            android:textSize="14sp"
+            tools:text="An impromptu gathering of local street artists showing off their latest mural work." />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -197,7 +223,7 @@
             android:orientation="horizontal">
 
             <LinearLayout
-                android:id="@+id/likeButton"
+                android:id="@+id/activeVotesButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:background="@drawable/pill_white_rounded"
@@ -213,11 +239,11 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_favorite_outline"
+                    android:src="@drawable/ic_event_live_pulse"
                     app:tint="@color/primary_coral" />
 
                 <TextView
-                    android:id="@+id/likesText"
+                    android:id="@+id/activeVotesText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
@@ -228,7 +254,7 @@
             </LinearLayout>
 
             <LinearLayout
-                android:id="@+id/commentButton"
+                android:id="@+id/inactiveVotesButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="10dp"
@@ -245,11 +271,11 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_help_bubble"
+                    android:src="@drawable/ic_event_off_slash"
                     app:tint="#4B8CF7" />
 
                 <TextView
-                    android:id="@+id/commentsText"
+                    android:id="@+id/inactiveVotesText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="8dp"
@@ -259,20 +285,42 @@
                     tools:text="45" />
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:background="@drawable/pill_white_rounded"
+                android:gravity="center_vertical"
+                android:minHeight="44dp"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="10dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="★"
+                    android:textColor="#F0A11D"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/averageRatingText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:textColor="@color/text_dark"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    tools:text="4.6★" />
+            </LinearLayout>
+
             <Space
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
-
-            <ImageButton
-                android:id="@+id/shareButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/feed_share"
-                android:padding="8dp"
-                android:src="@android:drawable/ic_menu_share"
-                app:tint="@color/text_dark" />
         </LinearLayout>
 
         <TextView
