@@ -28,21 +28,20 @@ class MainActivity : AppCompatActivity() {
     private fun setupEdgeToEdge() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            
+
             val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
             val currentDestinationId = navHostFragment.navController.currentDestination?.id
-            
+
             val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
-            
+
             if (currentDestinationId in authDestinations) {
-                // Remove all padding for auth screens to allow edge-to-edge backgrounds
                 binding.navHostFragment.updatePadding(top = 0, bottom = 0)
                 binding.bottomNavigationView.updatePadding(bottom = 0)
             } else {
-                binding.navHostFragment.updatePadding(top = systemBars.top, bottom = 80) // Adjust bottom for nav bar
+                binding.navHostFragment.updatePadding(top = systemBars.top, bottom = 80)
                 binding.bottomNavigationView.updatePadding(bottom = systemBars.bottom)
             }
-            
+
             insets
         }
     }
@@ -51,6 +50,7 @@ class MainActivity : AppCompatActivity() {
         val navHostFragment = supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment
         val navController = navHostFragment.navController
 
+        // Let NavigationUI handle normal selection for tabs
         binding.bottomNavigationView.setupWithNavController(navController)
 
         binding.fabAdd.setOnClickListener {
@@ -60,7 +60,6 @@ class MainActivity : AppCompatActivity() {
         val authDestinations = setOf(R.id.loginFragment, R.id.registerFragment)
 
         navController.addOnDestinationChangedListener { _, destination, _ ->
-            // Re-trigger inset application when destination changes
             ViewCompat.requestApplyInsets(binding.root)
 
             if (destination.id in authDestinations) {
@@ -74,27 +73,18 @@ class MainActivity : AppCompatActivity() {
 
                 when (destination.id) {
                     R.id.feedFragment -> {
-                        // Explicitly select the feed tab when on the feed
+                        // Ensure feed is visually selected when on feed
                         if (binding.bottomNavigationView.selectedItemId != R.id.feedFragment) {
                             binding.bottomNavigationView.selectedItemId = R.id.feedFragment
                         }
                     }
-                    R.id.mapFragment -> {
-                        if (binding.bottomNavigationView.selectedItemId != R.id.mapFragment) {
-                            binding.bottomNavigationView.selectedItemId = R.id.mapFragment
-                        }
-                    }
-                    R.id.profileFragment -> {
-                        if (binding.bottomNavigationView.selectedItemId != R.id.profileFragment) {
-                            binding.bottomNavigationView.selectedItemId = R.id.profileFragment
-                        }
-                    }
                     R.id.createEventFragment -> {
-                        // For the FAB-only screen, clear selection so no tab appears active
+                        // FAB-only screen: clear all tab selection
                         for (i in 0 until menu.size()) {
                             menu.getItem(i).isChecked = false
                         }
                     }
+                    // For map/profile, setupWithNavController will handle selection
                 }
             }
         }
