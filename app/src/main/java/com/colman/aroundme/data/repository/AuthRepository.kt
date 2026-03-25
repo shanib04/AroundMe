@@ -51,7 +51,7 @@ class AuthRepository(
     ): Result<UserProfile> = runCatching {
         val normalizedUsername = username.lowercase()
 
-        // 1) Ensure username is unique in Firestore
+        // Ensure username is unique in Firestore
         val existing = firestore.collection(USERS_COLLECTION)
             .whereEqualTo("username", normalizedUsername)
             .get()
@@ -60,11 +60,11 @@ class AuthRepository(
             error("Username is already taken")
         }
 
-        // 2) Create Auth user
+        // Create Auth user
         val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val user = authResult.user ?: error("Registration succeeded, but no user data was returned.")
 
-        // 3) Upload profile image if provided
+        // Upload profile image if provided
         var persistedImageSource = ""
         if (imageUri != null) {
             runCatching {
@@ -77,12 +77,12 @@ class AuthRepository(
             }
         }
 
-        // 4) Update Firebase Auth profile for convenience
+        // Update Firebase Auth profile for convenience
         runCatching {
             updateFirebaseUserProfile(user, displayName, persistedImageSource)
         }
 
-        // 5) Build and persist Firestore/Room user document
+        // Build and persist Firestore/Room user document
         val userDoc = User(
             id = user.uid,
             name = displayName,
@@ -99,7 +99,7 @@ class AuthRepository(
                 .await()
         }
 
-        // 6) Maintain existing UserProfile shape for rest of app
+        // Maintain existing UserProfile shape for rest of app
         val profile = UserProfile(
             userId = user.uid,
             fullName = displayName,

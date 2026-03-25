@@ -1,6 +1,5 @@
 package com.colman.aroundme.ui.auth
 
-// Legacy validator no longer used. Kept only to satisfy older tests; delegates to ViewModel-style rules.
 
 import android.net.Uri
 
@@ -15,17 +14,20 @@ class RegisterValidator(
         confirmPassword: String,
         imageUri: Uri?
     ): RegisterValidationResult {
-        // Minimal shim: treat fullName as displayName and synthesize a username
+        // Treat fullName as displayName and synthesize a basic username
         val displayName = fullName.trim()
-        val username = displayName.lowercase().replace("[^a-z0-9_]".toRegex(), "_").take(15)
+        val username = displayName
+            .lowercase()
+            .replace("[^a-z0-9_]".toRegex(), "_")
+            .take(15)
 
-        val vm = RegisterViewModelShim(strings, emailMatcher)
-        return vm.validateInputs(displayName, username, email, password, confirmPassword, imageUri)
+        val helper = RegisterValidationHelper(strings, emailMatcher)
+        return helper.validateInputs(displayName, username, email, password, confirmPassword)
     }
 }
 
-// Small shim that reuses the same validation logic as RegisterViewModel
-private class RegisterViewModelShim(
+// Small helper that reuses the same validation logic as RegisterViewModel
+private class RegisterValidationHelper(
     private val strings: RegisterStrings,
     private val emailMatcher: (String) -> Boolean
 ) {
@@ -34,8 +36,7 @@ private class RegisterViewModelShim(
         username: String,
         email: String,
         password: String,
-        confirmPassword: String,
-        imageUri: Uri?
+        confirmPassword: String
     ): RegisterValidationResult {
         val trimmedDisplayName = displayName.trim()
         val trimmedUsername = username.trim().lowercase()
@@ -46,7 +47,7 @@ private class RegisterViewModelShim(
         var emailError: String? = null
         var passwordError: String? = null
         var confirmPasswordError: String? = null
-        var profileImageError: String? = null
+        val profileImageError: String? = null
 
         val usernameRegex = Regex("^[a-z0-9_]{3,15}$")
         val displayNameRegex = Regex("^[a-zA-Z0-9_\\- ]{1,20}$")
