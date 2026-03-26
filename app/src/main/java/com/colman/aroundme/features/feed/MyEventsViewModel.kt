@@ -12,9 +12,7 @@ import com.colman.aroundme.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 
 data class MyEventItem(
-    val event: Event,
-    val publisherDisplayName: String,
-    val publisherUsername: String
+    val item: EventCardItem
 )
 
 class MyEventsViewModel(
@@ -50,9 +48,12 @@ class MyEventsViewModel(
         _events.value = currentEvents.map { event ->
             val user = usersById[event.publisherId]
             MyEventItem(
-                event = event,
-                publisherDisplayName = user?.displayName?.takeIf { it.isNotBlank() } ?: "Unknown Publisher",
-                publisherUsername = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
+                item = EventCardItemMapper.fromEvent(
+                    event = event,
+                    user = user,
+                    statusText = if (event.isEnded) "Ended" else "Live",
+                    postedText = if (event.isEnded) "RECREATE EVENT" else "EDIT EVENT"
+                )
             )
         }
     }

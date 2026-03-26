@@ -82,6 +82,7 @@ class FeedFragment : Fragment() {
 
     private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
     private var userSyncJob: Job? = null
+    private var ensureUsersJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -137,9 +138,13 @@ class FeedFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
-            state.items.forEach { item ->
-                if (item.hostName == "Unknown Publisher" && item.event.publisherId.isNotBlank()) {
-                    userRepository.refreshUserFromRemote(item.event.publisherId)
+            ensureUsersJob?.cancel()
+            ensureUsersJob = lifecycleScope.launch {
+                userRepository.ensureUsersLoaded(state.items.map { it.item.event.publisherId })
+            }
+            state.items.forEach { feedItem ->
+                if (feedItem.item.hostName == EventTextFormatter.unknownPublisherText() && feedItem.item.event.publisherId.isNotBlank()) {
+                    userRepository.refreshUserFromRemote(feedItem.item.event.publisherId)
                 }
             }
             render(state)
@@ -235,6 +240,7 @@ class FeedFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        ensureUsersJob?.cancel()
         userSyncJob?.cancel()
         locationTokenSource?.cancel()
         binding.feedRecyclerView.removeOnScrollListener(feedScrollListener)

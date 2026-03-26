@@ -15,7 +15,7 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentEventDetailsBinding
-import com.google.android.material.chip.Chip
+import com.colman.aroundme.features.feed.EventTextFormatter
 
 class EventDetailsFragment : Fragment() {
 
@@ -96,24 +96,15 @@ class EventDetailsFragment : Fragment() {
             binding.eventSubtitleText.text = event.description
             binding.eventSubtitleText.isVisible = event.description.isNotBlank()
             binding.locationTitleText.text = event.locationName
-            binding.reportedTimeText.text = event.timeRemaining
+            binding.reportedTimeText.text = EventTextFormatter.statusText(event)
             binding.helpText.text = getString(R.string.event_details_help_text, event.activeVotes + event.inactiveVotes)
             binding.activeVotesCountText.text = event.activeVotes.toString()
             binding.inactiveVotesCountText.text = event.inactiveVotes.toString()
-            binding.ratingSummaryText.text = if (event.ratingCount > 0) {
-                getString(R.string.event_rating_summary_format, event.averageRating, event.ratingCount)
-            } else {
-                getString(R.string.event_rating_empty)
-            }
+            binding.ratingSummaryText.text = EventTextFormatter.ratingSummaryText(event)
 
             binding.tagsChipGroup.removeAllViews()
-            event.tags.forEach { tag ->
-                val chip = Chip(requireContext()).apply {
-                    text = tag
-                    isClickable = false
-                    isCheckable = false
-                }
-                binding.tagsChipGroup.addView(chip)
+            EventTextFormatter.detailTagLabels(event.tags).forEach { tag ->
+                binding.tagsChipGroup.addView(EventTagChipBuilder.create(requireContext(), tag))
             }
 
             Glide.with(this)

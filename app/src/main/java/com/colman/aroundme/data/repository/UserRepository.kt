@@ -8,6 +8,7 @@ import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // Repository pattern for User data
@@ -20,18 +21,13 @@ class UserRepository private constructor(
 
     fun getUserById(id: String): Flow<User?> = userDao.getUserById(id)
 
-    // Observe a single user by id (flow from Room)
-    fun observeUser(id: String): Flow<User?> = userDao.getUserById(id)
-
     suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
 
     // Fetch a single user from Firebase and upsert locally (best-effort, non-blocking)
     fun refreshUserFromRemote(id: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val list = firebase.fetchUsersSince(0L)
-                val found = list.firstOrNull { it.id == id }
-                found?.let { userDao.insert(it.normalizedForDisplay()) }
+                firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
             } catch (_: Exception) {
                 // ignore
             }
@@ -50,7 +46,7 @@ class UserRepository private constructor(
     suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
         return try {
             firebase.isUsernameTaken(username, excludingUserId)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // On any error, be conservative and report it may be taken to avoid duplicates
             true
         }
@@ -85,8 +81,20 @@ class UserRepository private constructor(
         val safeDisplayName = displayName.takeIf { it.isNotBlank() }
             ?: username.takeIf { it.isNotBlank() }
             ?: name.takeIf { it.isNotBlank() }
-            ?: "Unknown Publisher"
+            ?: com.colman.aroundme.features.feed.EventTextFormatter.unknownPublisherText()
         return copy(displayName = safeDisplayName)
+    }
+
+    suspend fun ensureUsersLoaded(ids: Collection<String>) {
+        ids.map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .forEach { id ->
+                val existing = userDao.getUserById(id).first()
+                if (existing == null || existing.displayName.isBlank()) {
+                    firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
+                }
+            }
     }
 
     companion object {

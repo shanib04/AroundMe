@@ -38,6 +38,7 @@ class MyEventsFragment : Fragment() {
 
     private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
     private var userSyncJob: Job? = null
+    private var ensureUsersJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -62,9 +63,13 @@ class MyEventsFragment : Fragment() {
         binding.feedRecyclerView.adapter = adapter
 
         viewModel.events.observe(viewLifecycleOwner) { events ->
-            events.forEach { item ->
-                if (item.publisherDisplayName == "Unknown Publisher" && item.event.publisherId.isNotBlank()) {
-                    userRepository.refreshUserFromRemote(item.event.publisherId)
+            ensureUsersJob?.cancel()
+            ensureUsersJob = lifecycleScope.launch {
+                userRepository.ensureUsersLoaded(events.map { it.item.event.publisherId })
+            }
+            events.forEach { myEvent ->
+                if (myEvent.item.hostName == EventTextFormatter.unknownPublisherText() && myEvent.item.event.publisherId.isNotBlank()) {
+                    userRepository.refreshUserFromRemote(myEvent.item.event.publisherId)
                 }
             }
             adapter.submitList(events)
@@ -90,6 +95,7 @@ class MyEventsFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        ensureUsersJob?.cancel()
         userSyncJob?.cancel()
         binding.feedRecyclerView.adapter = null
         _binding = null

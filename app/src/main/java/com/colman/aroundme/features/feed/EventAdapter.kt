@@ -37,12 +37,13 @@ class EventAdapter(
         private val onVoteClick: (String, Boolean) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: FeedEventItem) {
+        fun bind(feedItem: FeedEventItem) {
+            val item = feedItem.item
             val event = item.event
             binding.hostNameText.text = item.hostName
             binding.hostSubtitleText.text = item.hostSubtitle
             binding.locationText.text = item.locationText
-            binding.distanceBadgeText.text = item.distanceText
+            binding.distanceBadgeText.text = feedItem.distanceText
             binding.statusBadgeText.text = item.statusText
             binding.eventTitleText.text = event.title.ifBlank { binding.root.context.getString(R.string.feed_empty_state_title) }
             binding.eventDescriptionText.text = event.description.ifBlank {
@@ -53,10 +54,10 @@ class EventAdapter(
             binding.postedTimeText.text = item.postedText
             binding.averageRatingText.text = item.averageRatingText
 
-            bindTags(item)
+            bindTags(item.tagLabels)
             bindImage(event.imageUrl)
             binding.eventDescriptionText.isVisible = event.description.isNotBlank()
-            updateVoteSelection(item)
+            updateVoteSelection(feedItem)
 
             binding.root.setOnClickListener { onEventClick(event.id) }
             binding.moreButton.setOnClickListener { onEventClick(event.id) }
@@ -76,15 +77,15 @@ class EventAdapter(
             binding.inactiveVotesText.setTextColor(if (item.isInactiveVoteSelected) selectedTextColor else defaultTextColor)
         }
 
-        private fun bindTags(item: FeedEventItem) {
+        private fun bindTags(tagLabels: List<String>) {
             val chips = listOf(binding.primaryTagChip, binding.secondaryTagChip, binding.tertiaryTagChip)
             chips.forEachIndexed { index, chip ->
-                val text = item.tagLabels.getOrNull(index)
+                val text = tagLabels.getOrNull(index)
                 chip.isVisible = text != null
                 chip.text = text ?: ""
             }
 
-            if (item.tagLabels.isEmpty()) {
+            if (tagLabels.isEmpty()) {
                 binding.primaryTagChip.isVisible = true
                 binding.primaryTagChip.text = binding.root.context.getString(R.string.feed_default_tag)
                 binding.secondaryTagChip.isVisible = false
@@ -110,7 +111,7 @@ class EventAdapter(
 
     private object DiffCallback : DiffUtil.ItemCallback<FeedEventItem>() {
         override fun areItemsTheSame(oldItem: FeedEventItem, newItem: FeedEventItem): Boolean {
-            return oldItem.event.id == newItem.event.id
+            return oldItem.item.event.id == newItem.item.event.id
         }
 
         override fun areContentsTheSame(oldItem: FeedEventItem, newItem: FeedEventItem): Boolean {

@@ -127,4 +127,11 @@
     <string name="my_events_empty">You haven’t created any events yet.</string>
     <string name="my_events_edit">Edit Event</string>
     <string name="my_events_recreate">Recreate Event</string>
+    <string name="event_unknown_publisher">Unknown Publisher</string>
+    <string name="event_unknown_location">Unknown location</string>
+    <string name="event_host_fallback">Event Host</string>
+    <string name="event_status_live">Live</string>
+    <string name="event_status_ended">Ended</string>
+    <string name="event_rating_summary_empty">No ratings yet</string>
+    <string name="map_showing_events_around_format">Showing events around %1$s</string>
 </resources>

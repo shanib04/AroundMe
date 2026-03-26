@@ -6,15 +6,25 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
+import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.features.feed.EventTextFormatter
 import kotlinx.coroutines.launch
+import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.sqrt
+
+data class MapFeaturedEventItem(
+    val event: Event,
+    val title: String,
+    val locationSummary: String,
+    val timeText: String
+)
 
 class MapViewModel(private val repository: EventRepository) : ViewModel() {
 
@@ -44,6 +54,22 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
     private val _selectedEventId = MutableLiveData<String?>(null)
     private val _selectedEvent = MediatorLiveData<Event?>()
     val selectedEvent: LiveData<Event?> = _selectedEvent
+
+    val selectedEventItem: LiveData<MapFeaturedEventItem?> = selectedEvent.map { event ->
+        event?.let {
+            val distance = distanceFromCenterKm(it)
+            MapFeaturedEventItem(
+                event = it,
+                title = it.title,
+                locationSummary = buildString {
+                    append(it.locationName.ifBlank { EventTextFormatter.unknownLocationText() })
+                    append(" • ")
+                    append(String.format(Locale.US, "%.1fkm away", distance))
+                },
+                timeText = EventTextFormatter.statusText(it)
+            )
+        }
+    }
 
     init {
         _availableFilters.addSource(allEvents) { events ->
@@ -99,7 +125,6 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
         val center = _searchCenter.value ?: DEFAULT_SEARCH_CENTER
         val radius = _radiusKm.value ?: DEFAULT_RADIUS_KM
 
-        val now = System.currentTimeMillis()
         _filteredEvents.value = events.filter { event ->
             val eventFilters = (listOf(event.category) + event.tags)
                 .map { it.trim().lowercase() }

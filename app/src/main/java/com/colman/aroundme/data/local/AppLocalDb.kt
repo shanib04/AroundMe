@@ -18,7 +18,7 @@ import androidx.room.TypeConverter
 
 @Database(
     entities = [User::class, Event::class, EventInteraction::class],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -155,6 +155,58 @@ abstract class AppLocalDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS users_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL DEFAULT '',
+                        username TEXT NOT NULL DEFAULT '',
+                        displayName TEXT NOT NULL DEFAULT '',
+                        profileImageUrl TEXT NOT NULL DEFAULT '',
+                        email TEXT NOT NULL DEFAULT '',
+                        bio TEXT NOT NULL DEFAULT '',
+                        points INTEGER NOT NULL DEFAULT 0,
+                        totalPoints INTEGER NOT NULL DEFAULT 0,
+                        eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
+                        validationsMadeCount INTEGER NOT NULL DEFAULT 0,
+                        rankTitle TEXT NOT NULL DEFAULT 'Newcomer',
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+
+                database.execSQL(
+                    """
+                    INSERT OR REPLACE INTO users_new (
+                        id, name, username, displayName, profileImageUrl, email, bio,
+                        points, totalPoints, eventsPublishedCount, validationsMadeCount,
+                        rankTitle, lastUpdated
+                    )
+                    SELECT
+                        id,
+                        COALESCE(name, ''),
+                        COALESCE(username, ''),
+                        COALESCE(displayName, ''),
+                        COALESCE(profileImageUrl, ''),
+                        COALESCE(email, ''),
+                        COALESCE(bio, ''),
+                        COALESCE(points, 0),
+                        COALESCE(totalPoints, 0),
+                        COALESCE(eventsPublishedCount, 0),
+                        COALESCE(validationsMadeCount, 0),
+                        COALESCE(rankTitle, 'Newcomer'),
+                        COALESCE(lastUpdated, 0)
+                    FROM users
+                    """.trimIndent()
+                )
+
+                database.execSQL("DROP TABLE users")
+                database.execSQL("ALTER TABLE users_new RENAME TO users")
+            }
+        }
+
         fun getInstance(context: Context): AppLocalDb {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -162,7 +214,24 @@ abstract class AppLocalDb : RoomDatabase() {
                     AppLocalDb::class.java,
                     "aroundme_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onCreate(db: SupportSQLiteDatabase) {
+                            super.onCreate(db)
+                            db.execSQL(
+                                """
+                                INSERT OR REPLACE INTO users (
+                                    id, name, username, displayName, profileImageUrl, email, bio,
+                                    points, totalPoints, eventsPublishedCount, validationsMadeCount,
+                                    rankTitle, lastUpdated
+                                ) VALUES (
+                                    'demo_publisher', 'AroundMe Team', 'aroundme', 'AroundMe Team', '', '', '',
+                                    0, 0, 0, 0, 'Newcomer', 0
+                                )
+                                """.trimIndent()
+                            )
+                        }
+                    })
                     .build()
                 INSTANCE = instance
                 instance

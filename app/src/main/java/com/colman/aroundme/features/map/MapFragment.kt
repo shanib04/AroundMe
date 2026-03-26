@@ -17,7 +17,6 @@ import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -229,12 +228,12 @@ class MapFragment : Fragment() {
                 mapIntent.setPackage("com.google.android.apps.maps")
                 try {
                     startActivity(mapIntent)
-                } catch (e: ActivityNotFoundException) {
+                } catch (_: ActivityNotFoundException) {
                     val genericUri = Uri.parse("geo:${event.latitude},${event.longitude}?q=${event.latitude},${event.longitude}(${Uri.encode(event.title)})")
                     val genericIntent = Intent(Intent.ACTION_VIEW, genericUri)
                     try {
                         startActivity(genericIntent)
-                    } catch (ex: ActivityNotFoundException) {
+                    } catch (_: ActivityNotFoundException) {
                         Toast.makeText(requireContext(), "No navigation app found", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -310,16 +309,15 @@ class MapFragment : Fragment() {
                             ) {}
 
                             binding.locationEditText.setTag(R.id.locationEditText, combined)
-                            val auto = binding.locationEditText as AutoCompleteTextView
-                            auto.setAdapter(adapter)
-                            auto.showDropDown()
+                            binding.locationEditText.setAdapter(adapter)
+                            binding.locationEditText.showDropDown()
                         }
                     }
                 }
             }
         })
 
-        (binding.locationEditText as AutoCompleteTextView).setOnItemClickListener { _, _, position, _ ->
+        binding.locationEditText.setOnItemClickListener { _, _, position, _ ->
             @Suppress("UNCHECKED_CAST")
             val items = binding.locationEditText.getTag(R.id.locationEditText) as? List<SuggestionItem>
                 ?: return@setOnItemClickListener
@@ -459,33 +457,27 @@ class MapFragment : Fragment() {
         }
 
         viewModel.searchLocationLabel.observe(viewLifecycleOwner) { label ->
-            binding.currentAreaText.text = "Showing events around $label"
+            binding.currentAreaText.text = getString(R.string.map_showing_events_around_format, label)
         }
 
-        viewModel.selectedEvent.observe(viewLifecycleOwner) { event ->
+        viewModel.selectedEventItem.observe(viewLifecycleOwner) { selectedItem ->
             val density = resources.displayMetrics.density
-            if (event == null) {
+            val event = selectedItem?.event
+            if (selectedItem == null || event == null) {
                 binding.featuredCard.root.visibility = View.GONE
                 googleMap?.setPadding(0, 0, 0, 0)
             } else {
                 binding.featuredCard.root.visibility = View.VISIBLE
-                binding.featuredCard.eventTitleText.text = event.title
-
-                val distance = viewModel.distanceFromCenterKm(event)
-                binding.featuredCard.eventLocationText.text = "${event.locationName} • ${"%.1f".format(distance)}km away"
-
-                binding.featuredCard.eventTimeValue.text = event.timeRemaining
+                binding.featuredCard.eventTitleText.text = selectedItem.title
+                binding.featuredCard.eventLocationText.text = selectedItem.locationSummary
+                binding.featuredCard.eventTimeValue.text = selectedItem.timeText
 
                 Glide.with(this)
                     .load(event.imageUrl)
                     .centerCrop()
                     .into(binding.featuredCard.eventImageView)
 
-                // Add exact padding to place the unpadded center of the map accurately in the visible area.
-                // 150dp bottom padding perfectly balances the visible area above the pop-up card.
                 googleMap?.setPadding(0, 0, 0, (150 * density).toInt())
-
-                // Perfectly center the tapped marker considering the newly created space!
                 val position = LatLng(event.latitude, event.longitude)
                 googleMap?.animateCamera(CameraUpdateFactory.newLatLng(position), 300, null)
             }

@@ -12,7 +12,6 @@ import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.atan2
@@ -23,19 +22,10 @@ import kotlin.math.sqrt
 private const val DEFAULT_FEED_LOCATION_LABEL = "Kefar Sava"
 
 data class FeedEventItem(
-    val event: Event,
-    val hostName: String,
-    val hostSubtitle: String,
-    val locationText: String,
+    val item: EventCardItem,
     val distanceText: String,
-    val statusText: String,
-    val activeVotesText: String,
-    val inactiveVotesText: String,
-    val averageRatingText: String,
     val isActiveVoteSelected: Boolean,
-    val isInactiveVoteSelected: Boolean,
-    val postedText: String,
-    val tagLabels: List<String>
+    val isInactiveVoteSelected: Boolean
 )
 
 data class FeedUiState(
@@ -96,7 +86,7 @@ class FeedViewModel(
         viewModelScope.launch {
             isRefreshing = true
             publishState()
-            delay(500)
+            kotlinx.coroutines.delay(500)
             currentPageSize = PAGE_SIZE
             isRefreshing = false
             syncInteractionCache(sourceEvents)
@@ -111,7 +101,7 @@ class FeedViewModel(
         viewModelScope.launch {
             isLoadingMore = true
             publishState()
-            delay(450)
+            kotlinx.coroutines.delay(450)
             currentPageSize = (currentPageSize + PAGE_SIZE).coerceAtMost(sorted.size)
             isLoadingMore = false
             publishState()
@@ -194,32 +184,16 @@ class FeedViewModel(
         val selectedVote = interactionCache[id]
         val hostUser = sourceUsersById[publisherId]
         return FeedEventItem(
-            event = this,
-            hostName = hostUser.toFeedHostName(),
-            hostSubtitle = hostUser.toFeedHostSubtitle(category),
-            locationText = locationName.ifBlank { "Unknown location" },
+            item = EventCardItemMapper.fromEvent(
+                event = this,
+                user = hostUser,
+                statusText = EventTextFormatter.statusText(this),
+                postedText = EventTextFormatter.postedTimeText(publishTime)
+            ),
             distanceText = formatDistance(distanceKm),
-            statusText = timeRemaining.ifBlank {
-                if (isEnded) "Ended" else buildStatusFromExpiration(expirationTime)
-            },
-            activeVotesText = formatCompactCount(activeVotes),
-            inactiveVotesText = formatCompactCount(inactiveVotes),
-            averageRatingText = formatAverageRating(averageRating, ratingCount),
             isActiveVoteSelected = selectedVote == EventVoteType.ACTIVE,
-            isInactiveVoteSelected = selectedVote == EventVoteType.INACTIVE,
-            postedText = formatPostedTime(publishTime),
-            tagLabels = tags.filter { it.isNotBlank() }.take(3).map { "#${it.trim().replace(" ", "")}" }
+            isInactiveVoteSelected = selectedVote == EventVoteType.INACTIVE
         )
-    }
-
-    private fun User?.toFeedHostName(): String {
-        return this?.displayName?.takeIf { it.isNotBlank() } ?: "Unknown Publisher"
-    }
-
-    private fun User?.toFeedHostSubtitle(fallbackCategory: String): String {
-        val user = this
-        return user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" }
-            ?: fallbackCategory.ifBlank { "Event Host" }
     }
 
     private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
@@ -235,47 +209,11 @@ class FeedViewModel(
         return earthRadiusKm * c
     }
 
-    private fun buildStatusFromExpiration(expirationTime: Long): String {
-        if (expirationTime <= 0L) return "Live"
-        val remainingMinutes = ((expirationTime - System.currentTimeMillis()) / 60000L).coerceAtLeast(0L)
-        return when {
-            remainingMinutes < 60L -> "Ends in ${remainingMinutes}m"
-            remainingMinutes < 1440L -> "Ends in ${remainingMinutes / 60L}h"
-            else -> "Ends in ${remainingMinutes / 1440L}d"
-        }
-    }
-
     private fun formatDistance(distanceKm: Double): String {
         return if (distanceKm < 1.0) {
             "${(distanceKm * 1000).toInt()}m"
         } else {
             String.format(Locale.US, "%.1fkm", distanceKm)
-        }
-    }
-
-    private fun formatCompactCount(value: Int): String {
-        return if (value >= 1000) {
-            String.format(Locale.US, "%.1fk", value / 1000f)
-        } else {
-            value.toString()
-        }
-    }
-
-    private fun formatAverageRating(averageRating: Double, ratingCount: Int): String {
-        return if (ratingCount <= 0) {
-            "New"
-        } else {
-            String.format(Locale.US, "%.1f★", averageRating)
-        }
-    }
-
-    private fun formatPostedTime(timestamp: Long): String {
-        val elapsedMinutes = ((System.currentTimeMillis() - timestamp).coerceAtLeast(0L)) / 60000L
-        return when {
-            elapsedMinutes < 1L -> "POSTED JUST NOW"
-            elapsedMinutes < 60L -> "POSTED ${elapsedMinutes}M AGO"
-            elapsedMinutes < 1440L -> "POSTED ${elapsedMinutes / 60L}H AGO"
-            else -> "POSTED ${elapsedMinutes / 1440L}D AGO"
         }
     }
 

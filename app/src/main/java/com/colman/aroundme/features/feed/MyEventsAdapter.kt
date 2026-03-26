@@ -31,36 +31,21 @@ class MyEventsAdapter(
         private val onRecreateClick: (String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(item: MyEventItem) {
+        fun bind(myEvent: MyEventItem) {
+            val item = myEvent.item
             val event = item.event
-            binding.hostNameText.text = item.publisherDisplayName
-            binding.hostSubtitleText.text = item.publisherUsername.ifBlank { event.category.ifBlank { "Your Event" } }
-            binding.locationText.text = event.locationName
-            binding.distanceBadgeText.text = if (event.ratingCount > 0) {
-                String.format(java.util.Locale.US, "%.1f★", event.averageRating)
-            } else {
-                binding.root.context.getString(R.string.event_rating_empty)
-            }
-            binding.statusBadgeText.text = if (event.isEnded) {
-                binding.root.context.getString(R.string.feed_status_ended)
-            } else {
-                binding.root.context.getString(R.string.feed_status_live)
-            }
+            binding.hostNameText.text = item.hostName
+            binding.hostSubtitleText.text = item.hostSubtitle
+            binding.locationText.text = item.locationText
+            binding.distanceBadgeText.text = item.averageRatingText
+            binding.statusBadgeText.text = item.statusText
             binding.eventTitleText.text = event.title
             binding.eventDescriptionText.text = event.description
             binding.eventDescriptionText.isVisible = event.description.isNotBlank()
-            binding.activeVotesText.text = event.activeVotes.toString()
-            binding.inactiveVotesText.text = event.inactiveVotes.toString()
-            binding.averageRatingText.text = if (event.ratingCount > 0) {
-                String.format(java.util.Locale.US, "%.1f★", event.averageRating)
-            } else {
-                "New"
-            }
-            binding.postedTimeText.text = if (event.isEnded) {
-                binding.root.context.getString(R.string.my_events_recreate)
-            } else {
-                binding.root.context.getString(R.string.my_events_edit)
-            }
+            binding.activeVotesText.text = item.activeVotesText
+            binding.inactiveVotesText.text = item.inactiveVotesText
+            binding.averageRatingText.text = item.averageRatingText
+            binding.postedTimeText.text = item.postedText
 
             binding.moreButton.isVisible = false
             binding.activeVotesButton.isVisible = false
@@ -88,35 +73,42 @@ class MyEventsAdapter(
                 if (isEnded) onRecreateClick(event.id) else onEditClick(event.id)
             }
 
+            bindTags(item.tagLabels)
+            bindImage(event.imageUrl)
+        }
+
+        private fun bindTags(tagLabels: List<String>) {
             val chips = listOf(binding.primaryTagChip, binding.secondaryTagChip, binding.tertiaryTagChip)
             chips.forEachIndexed { index, chip ->
-                val text = event.tags.getOrNull(index)?.let { "#${it.trim().replace(" ", "")}" }
+                val text = tagLabels.getOrNull(index)
                 chip.isVisible = text != null
                 chip.text = text ?: ""
             }
-            if (event.tags.isEmpty()) {
+            if (tagLabels.isEmpty()) {
                 binding.primaryTagChip.isVisible = true
                 binding.primaryTagChip.text = binding.root.context.getString(R.string.feed_default_tag)
                 binding.secondaryTagChip.isVisible = false
                 binding.tertiaryTagChip.isVisible = false
             }
+        }
 
-            if (event.imageUrl.isBlank()) {
+        private fun bindImage(imageUrl: String) {
+            if (imageUrl.isBlank()) {
                 binding.eventImageView.setImageResource(R.drawable.bg_register_image_placeholder)
-            } else {
-                Picasso.get()
-                    .load(event.imageUrl)
-                    .placeholder(R.drawable.bg_register_image_placeholder)
-                    .error(R.drawable.bg_register_image_placeholder)
-                    .fit()
-                    .centerCrop()
-                    .into(binding.eventImageView)
+                return
             }
+            Picasso.get()
+                .load(imageUrl)
+                .placeholder(R.drawable.bg_register_image_placeholder)
+                .error(R.drawable.bg_register_image_placeholder)
+                .fit()
+                .centerCrop()
+                .into(binding.eventImageView)
         }
     }
 
     private object DiffCallback : DiffUtil.ItemCallback<MyEventItem>() {
-        override fun areItemsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem.event.id == newItem.event.id
+        override fun areItemsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem.item.event.id == newItem.item.event.id
         override fun areContentsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem == newItem
     }
 }
