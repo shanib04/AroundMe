@@ -143,4 +143,13 @@
     <string name="delete_profile_label">Delete Profile</string>
     <string name="zero_text">0</string>
     <string name="zero_decimal_text">0.0</string>
+    <string name="logout_label">Logout</string>
+    <string name="profile_email_read_only">Email cannot be edited</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="edit_profile_picture_hint">Choose a photo that represents you</string>
+    <string name="edit_profile_camera">Camera</string>
+    <string name="edit_profile_gallery">Gallery</string>
+    <string name="edit_profile_username_hint">Choose your username</string>
+    <string name="edit_profile_display_name_hint">How should people see you?</string>
 </resources>

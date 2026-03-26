@@ -3,6 +3,7 @@ package com.colman.aroundme.features.profile
 import android.app.Application
 import android.net.Uri
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -104,6 +105,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         if (currentUserId == userId && userObserverSource != null && eventObserverSource != null) {
+            viewModelScope.launch(Dispatchers.IO) {
+                userRepo.refreshUserFromRemote(userId)
+            }
             return
         }
 
@@ -158,7 +162,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         radiusSaveJob = viewModelScope.launch(Dispatchers.IO) {
             runCatching { userRepo.upsertUser(updated, pushToRemote = false) }
             delay(250)
-            runCatching { userRepo.upsertUser(updated, pushToRemote = true) }
+            runCatching { userRepo.updateUserProfile(updated, pushToRemote = true) }
         }
     }
 
@@ -178,7 +182,10 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 var imageUrl = tempImageUri?.toString().orEmpty()
                 if (tempImageUri != null && tempImageUri.scheme != "http" && tempImageUri.scheme != "https") {
                     firebase?.let { f ->
-                        imageUrl = f.uploadImage(tempImageUri, "profile_images/$userId.jpg") { progress ->
+                        imageUrl = f.uploadImage(
+                            tempImageUri,
+                            buildProfileImageRemotePath(userId)
+                        ) { progress ->
                             _uploadProgress.postValue(progress)
                         }
                     }
@@ -195,7 +202,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     points = existing?.points ?: 0,
                     eventsPublishedCount = existing?.eventsPublishedCount ?: 0,
                     validationsMadeCount = existing?.validationsMadeCount ?: 0,
-                    rankTitle = existing?.rankTitle ?: "Newcomer",
                     lastUpdated = System.currentTimeMillis()
                 )
 
@@ -209,19 +215,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
 
-                userRepo.upsertUser(updated, pushToRemote = true)
-
-                runCatching {
-                    authRepo.getCurrentUser()?.let { fbUser ->
-                        if (fbUser.displayName != updated.displayName || fbUser.photoUrl?.toString() != updated.profileImageUrl) {
-                            val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                                .setDisplayName(updated.displayName)
-                                .setPhotoUri(updated.profileImageUrl.takeIf(String::isNotBlank)?.let(Uri::parse))
-                                .build()
-                            fbUser.updateProfile(req).await()
-                        }
-                    }
-                }
+                userRepo.updateUserProfile(updated, pushToRemote = true)
 
                 currentUser = updated
                 postUser(updated)
@@ -229,6 +223,20 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 _loading.postValue(false)
                 _uploadProgress.postValue(0)
                 onComplete(true, null)
+
+                runCatching {
+                    authRepo.getCurrentUser()?.let { fbUser ->
+                        if (fbUser.displayName != updated.displayName || fbUser.photoUrl?.toString() != updated.profileImageUrl) {
+                            val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                .setDisplayName(updated.displayName)
+                                .setPhotoUri(updated.profileImageUrl.takeIf(String::isNotBlank)?.toUri())
+                                .build()
+                            fbUser.updateProfile(req).await()
+                        }
+                    }
+                }.onFailure {
+                    Log.w("ProfileViewModel", "Firebase Auth profile sync failed after save", it)
+                }
             } catch (ex: Exception) {
                 Log.e("ProfileViewModel", "saveProfile failed", ex)
                 _loading.postValue(false)
@@ -310,7 +318,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             points = baseUser?.points ?: 0,
             eventsPublishedCount = baseUser?.eventsPublishedCount ?: 0,
             validationsMadeCount = baseUser?.validationsMadeCount ?: 0,
-            rankTitle = baseUser?.rankTitle ?: "Newcomer",
             lastUpdated = maxOf(baseUser?.lastUpdated ?: 0L, System.currentTimeMillis())
         )
     }
@@ -401,19 +408,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         _progressPercent.postValue((pointsIntoLevel.toFloat() / levelRange.toFloat()).coerceIn(0f, 1f))
         _progressText.postValue("$pointsToNext pts to Level ${level + 1}")
 
-        val degree = user?.rankTitle?.takeIf { it.isNotBlank() } ?: when {
-            points <= 100 -> "Local Scout"
-            points <= 300 -> "Active Explorer"
-            else -> "Community Pillar"
-        }
-        _userDegree.postValue(degree)
-
         val achievements = buildList {
             if (realEventCount > 0) add("Event Creator")
             if (realValidations > 0) add("Community Validator")
             if (points >= 100) add("Rising Local")
         }
         _achievements.postValue(achievements)
+    }
+
+    private fun buildProfileImageRemotePath(userId: String): String {
+        return "profile_images/$userId/${System.currentTimeMillis()}.jpg"
     }
 
     override fun onCleared() {

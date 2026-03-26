@@ -59,21 +59,15 @@ class AuthRepository(
         val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val user = authResult.user ?: error("Registration succeeded, but no user data was returned.")
 
-        var persistedImageSource = ""
-        if (imageUri != null) {
-            runCatching {
-                val localImageUri = copyImageToAppStorage(imageUri, user.uid)
-                persistedImageSource = localImageUri.toString()
-                val uploadedUrl = uploadProfileImage(user.uid, localImageUri)
-                if (uploadedUrl.isNotBlank()) {
-                    persistedImageSource = uploadedUrl
-                }
+        val persistedImageSource = if (imageUri != null) {
+            uploadProfileImage(user.uid, imageUri).ifBlank {
+                error("Profile image upload succeeded, but no image URL was returned.")
             }
+        } else {
+            ""
         }
 
-        runCatching {
-            updateFirebaseUserProfile(user, displayName, persistedImageSource)
-        }
+        updateFirebaseUserProfile(user, displayName, persistedImageSource)
 
         val userDoc = User(
             id = user.uid,
@@ -83,12 +77,10 @@ class AuthRepository(
             email = email
         )
 
-        runCatching {
-            firestore.collection(USERS_COLLECTION)
-                .document(user.uid)
-                .set(userDoc)
-                .await()
-        }
+        firestore.collection(USERS_COLLECTION)
+            .document(user.uid)
+            .set(userDoc)
+            .await()
 
         userDoc
     }
@@ -224,7 +216,6 @@ class AuthRepository(
             points = primary?.points ?: fallback.points,
             eventsPublishedCount = primary?.eventsPublishedCount ?: fallback.eventsPublishedCount,
             validationsMadeCount = primary?.validationsMadeCount ?: fallback.validationsMadeCount,
-            rankTitle = primary?.rankTitle?.ifBlank { fallback.rankTitle } ?: fallback.rankTitle,
             lastUpdated = maxOf(primary?.lastUpdated ?: 0L, fallback.lastUpdated)
         )
 

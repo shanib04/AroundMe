@@ -12,6 +12,7 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.FragmentProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -54,12 +55,14 @@ class ProfileFragment : Fragment() {
             viewModel.loadCurrentUser()
 
             if (_binding != null) {
-                binding.toolbarProfile.setNavigationOnClickListener { findNavController().popBackStack() }
+                binding.toolbarProfile.setNavigationOnClickListener {
+                    findNavController().navigate(R.id.feedFragment)
+                }
+                binding.toolbarProfile.menu.clear()
                 binding.toolbarProfile.inflateMenu(R.menu.menu_profile)
                 binding.toolbarProfile.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
-                        R.id.action_settings -> {
-                            // Open edit profile screen directly
+                        R.id.action_edit_profile -> {
                             findNavController().navigate(R.id.action_profileFragment_to_editProfileFragment)
                             true
                         }
@@ -98,12 +101,27 @@ class ProfileFragment : Fragment() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadCurrentUser()
+    }
+
     private fun observeViewModel() {
         val profileBinding = _binding ?: return
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
-            if (uri != null) Glide.with(this).load(uri).circleCrop().into(profileBinding.profileImageView)
-            else profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+            if (uri != null) {
+                Glide.with(this)
+                    .load(uri)
+                    .placeholder(R.drawable.ic_person_placeholder)
+                    .error(R.drawable.ic_person_placeholder)
+                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                    .skipMemoryCache(true)
+                    .circleCrop()
+                    .into(profileBinding.profileImageView)
+            } else {
+                profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+            }
         }
 
         viewModel.displayName.observe(viewLifecycleOwner) { displayName ->
@@ -113,11 +131,6 @@ class ProfileFragment : Fragment() {
         viewModel.username.observe(viewLifecycleOwner) { username ->
             profileBinding.profileHandleText.text = username.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
             profileBinding.profileHandleText.isVisible = username.isNotBlank()
-        }
-
-        viewModel.userDegree.observe(viewLifecycleOwner) { degree ->
-            profileBinding.userDegreeText.text = degree
-            profileBinding.userDegreeText.isVisible = degree.isNotBlank()
         }
 
         viewModel.eventsCreated.observe(viewLifecycleOwner) { count ->

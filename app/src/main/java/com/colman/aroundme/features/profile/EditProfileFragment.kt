@@ -82,8 +82,20 @@ class EditProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        binding.emailEditText.apply {
+            isEnabled = false
+            isFocusable = false
+            isFocusableInTouchMode = false
+            isClickable = false
+            keyListener = null
+        }
+        binding.emailLayout.helperText = getString(R.string.profile_email_read_only)
+
+        binding.btnCancel.setOnClickListener { findNavController().popBackStack() }
+
         val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
         if (currentUserId.isNotBlank()) {
+            tempImageUri = null
             viewModel.loadUser(currentUserId)
         }
 
@@ -124,7 +136,8 @@ class EditProfileFragment : Fragment() {
             binding.saveButton.isEnabled = !loading
             binding.deleteButton.isEnabled = !loading
             binding.emailEditText.isEnabled = !loading
-            binding.cameraFab.isEnabled = !loading
+            binding.cameraButton.isEnabled = !loading
+            binding.galleryButton.isEnabled = !loading
         }
 
         viewModel.uploadProgress.observe(viewLifecycleOwner) { p ->
@@ -136,8 +149,7 @@ class EditProfileFragment : Fragment() {
             }
         }
 
-        binding.cameraFab.setOnClickListener {
-            // request camera permission and then launch camera capture
+        binding.cameraButton.setOnClickListener {
             val hasCameraPerm = ContextCompat.checkSelfPermission(requireContext(), android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
             if (hasCameraPerm) {
                 val imgUri = createImageFileUri()
@@ -152,13 +164,11 @@ class EditProfileFragment : Fragment() {
             }
         }
 
-        binding.clearImageButton.setOnClickListener {
-            tempImageUri = null
-            binding.editProfileImageView.setImageResource(R.drawable.ic_person_placeholder)
+        binding.galleryButton.setOnClickListener {
+            pickImage.launch("image/*")
         }
 
         binding.saveButton.setOnClickListener {
-            val newEmail = binding.emailEditText.text?.toString().orEmpty()
             val newUsername = binding.usernameEditText.text?.toString().orEmpty()
             val newDisplay = binding.displayNameEditText.text?.toString().orEmpty()
 
@@ -166,12 +176,7 @@ class EditProfileFragment : Fragment() {
                 binding.displayNameEditText.error = "Display name required"
                 return@setOnClickListener
             }
-            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(newEmail).matches()) {
-                binding.emailEditText.error = "Enter valid email"
-                return@setOnClickListener
-            }
 
-            // username rules: up to 15 chars; lowercase letters, numbers, hyphen, underscore
             val usernameRegex = "^[a-z0-9_-]{1,15}$".toRegex()
             if (newUsername.isNotBlank() && !usernameRegex.matches(newUsername)) {
                 binding.usernameEditText.error = "Invalid username"
@@ -186,7 +191,6 @@ class EditProfileFragment : Fragment() {
                     return@launch
                 }
 
-                viewModel.setEmail(newEmail)
                 viewModel.setUsername(newUsername)
                 viewModel.setDisplayName(newDisplay)
                 viewModel.saveProfile(currentId, tempImageUri) { ok, err ->

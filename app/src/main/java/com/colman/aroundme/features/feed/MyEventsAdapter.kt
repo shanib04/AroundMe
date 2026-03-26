@@ -9,6 +9,8 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.ViewEventCardBinding
+import com.squareup.picasso.MemoryPolicy
+import com.squareup.picasso.NetworkPolicy
 import com.squareup.picasso.Picasso
 
 class MyEventsAdapter(
@@ -36,6 +38,7 @@ class MyEventsAdapter(
             val event = item.event
             binding.hostNameText.text = item.hostName
             binding.hostSubtitleText.text = item.hostSubtitle
+            bindHostAvatar(item.hostAvatarUrl)
             binding.locationText.text = item.locationText
             binding.distanceBadgeText.text = item.averageRatingText
             binding.statusBadgeText.text = item.statusText
@@ -90,6 +93,22 @@ class MyEventsAdapter(
                 binding.secondaryTagChip.isVisible = false
                 binding.tertiaryTagChip.isVisible = false
             }
+        }
+
+        private fun bindHostAvatar(avatarUrl: String) {
+            if (avatarUrl.isBlank()) {
+                binding.hostAvatarImageView.setImageResource(R.drawable.ic_person_placeholder)
+                return
+            }
+            Picasso.get()
+                .load(avatarUrl)
+                .placeholder(R.drawable.ic_person_placeholder)
+                .error(R.drawable.ic_person_placeholder)
+                .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
+                .networkPolicy(NetworkPolicy.NO_CACHE)
+                .fit()
+                .centerCrop()
+                .into(binding.hostAvatarImageView)
         }
 
         private fun bindImage(imageUrl: String) {

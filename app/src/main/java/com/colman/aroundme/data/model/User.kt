@@ -14,6 +14,5 @@ data class User(
     val points: Int = 0,
     val eventsPublishedCount: Int = 0,
     val validationsMadeCount: Int = 0,
-    val rankTitle: String = "Newcomer",
     val lastUpdated: Long = System.currentTimeMillis() // For Room Sync
 )

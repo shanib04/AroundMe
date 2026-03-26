@@ -18,7 +18,7 @@ import androidx.room.TypeConverter
 
 @Database(
     entities = [User::class, Event::class, EventInteraction::class],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -352,6 +352,49 @@ abstract class AppLocalDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS users_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        username TEXT NOT NULL DEFAULT '',
+                        displayName TEXT NOT NULL DEFAULT '',
+                        profileImageUrl TEXT NOT NULL DEFAULT '',
+                        email TEXT NOT NULL DEFAULT '',
+                        discoveryRadiusKm INTEGER NOT NULL DEFAULT 15,
+                        points INTEGER NOT NULL DEFAULT 0,
+                        eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
+                        validationsMadeCount INTEGER NOT NULL DEFAULT 0,
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT OR REPLACE INTO users_new (
+                        id, username, displayName, profileImageUrl, email,
+                        discoveryRadiusKm, points, eventsPublishedCount, validationsMadeCount, lastUpdated
+                    )
+                    SELECT
+                        id,
+                        COALESCE(username, ''),
+                        COALESCE(displayName, ''),
+                        COALESCE(profileImageUrl, ''),
+                        COALESCE(email, ''),
+                        COALESCE(discoveryRadiusKm, 15),
+                        COALESCE(points, 0),
+                        COALESCE(eventsPublishedCount, 0),
+                        COALESCE(validationsMadeCount, 0),
+                        COALESCE(lastUpdated, 0)
+                    FROM users
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE users")
+                database.execSQL("ALTER TABLE users_new RENAME TO users")
+            }
+        }
+
         fun getInstance(context: Context): AppLocalDb {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -359,7 +402,7 @@ abstract class AppLocalDb : RoomDatabase() {
                     AppLocalDb::class.java,
                     "aroundme_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
@@ -367,11 +410,10 @@ abstract class AppLocalDb : RoomDatabase() {
                                 """
                                 INSERT OR REPLACE INTO users (
                                     id, username, displayName, profileImageUrl, email,
-                                    discoveryRadiusKm, points, eventsPublishedCount, validationsMadeCount,
-                                    rankTitle, lastUpdated
+                                    discoveryRadiusKm, points, eventsPublishedCount, validationsMadeCount, lastUpdated
                                 ) VALUES (
                                     'demo_publisher', 'aroundme', 'AroundMe Team', '', '',
-                                    15, 0, 0, 0, 'Newcomer', 0
+                                    15, 0, 0, 0, 0
                                 )
                                 """.trimIndent()
                             )

@@ -42,6 +42,14 @@ class UserRepository private constructor(
         }
     }
 
+    suspend fun updateUserProfile(user: User, pushToRemote: Boolean = true) {
+        val normalized = user.normalizedForDisplay()
+        userDao.insert(normalized)
+        if (pushToRemote) {
+            firebase.updateUserProfile(normalized)
+        }
+    }
+
     // Check remote Firestore if username is taken (best-effort)
     suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
         return try {
