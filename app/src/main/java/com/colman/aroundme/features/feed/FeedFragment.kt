@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -21,11 +22,14 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class FeedFragment : Fragment() {
@@ -35,7 +39,10 @@ class FeedFragment : Fragment() {
         get() = requireNotNull(_binding)
 
     private val viewModel: FeedViewModel by viewModels {
-        FeedViewModel.Factory(EventRepository.getInstance(requireContext()))
+        FeedViewModel.Factory(
+            EventRepository.getInstance(requireContext()),
+            UserRepository.getInstance(requireContext())
+        )
     }
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
@@ -73,6 +80,9 @@ class FeedFragment : Fragment() {
         }
     }
 
+    private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
+    private var userSyncJob: Job? = null
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -89,6 +99,10 @@ class FeedFragment : Fragment() {
         setupSortDropdown()
         setupRefresh()
         observeViewModel()
+        userSyncJob?.cancel()
+        userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
+            userRepository.syncFromRemoteNow()
+        }
         requestLocationForDistance()
     }
 
@@ -113,6 +127,9 @@ class FeedFragment : Fragment() {
 
     private fun setupRefresh() {
         binding.refreshButton.setOnClickListener {
+            lifecycleScope.launch {
+                userRepository.syncFromRemoteNow()
+            }
             viewModel.refresh()
             requestLocationForDistance()
         }
@@ -120,6 +137,11 @@ class FeedFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
+            state.items.forEach { item ->
+                if (item.hostName == "Unknown Publisher" && item.event.publisherId.isNotBlank()) {
+                    userRepository.refreshUserFromRemote(item.event.publisherId)
+                }
+            }
             render(state)
         }
     }
@@ -213,6 +235,7 @@ class FeedFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        userSyncJob?.cancel()
         locationTokenSource?.cancel()
         binding.feedRecyclerView.removeOnScrollListener(feedScrollListener)
         binding.feedRecyclerView.adapter = null

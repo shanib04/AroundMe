@@ -8,14 +8,13 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
-import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.databinding.ViewEventCardBinding
 import com.squareup.picasso.Picasso
 
 class MyEventsAdapter(
     private val onEditClick: (String) -> Unit,
     private val onRecreateClick: (String) -> Unit
-) : ListAdapter<Event, MyEventsAdapter.MyEventViewHolder>(DiffCallback) {
+) : ListAdapter<MyEventItem, MyEventsAdapter.MyEventViewHolder>(DiffCallback) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyEventViewHolder {
         val binding = ViewEventCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -32,9 +31,10 @@ class MyEventsAdapter(
         private val onRecreateClick: (String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(event: Event) {
-            binding.hostNameText.text = event.title
-            binding.hostSubtitleText.text = event.category.ifBlank { "Your Event" }
+        fun bind(item: MyEventItem) {
+            val event = item.event
+            binding.hostNameText.text = item.publisherDisplayName
+            binding.hostSubtitleText.text = item.publisherUsername.ifBlank { event.category.ifBlank { "Your Event" } }
             binding.locationText.text = event.locationName
             binding.distanceBadgeText.text = if (event.ratingCount > 0) {
                 String.format(java.util.Locale.US, "%.1f★", event.averageRating)
@@ -115,8 +115,8 @@ class MyEventsAdapter(
         }
     }
 
-    private object DiffCallback : DiffUtil.ItemCallback<Event>() {
-        override fun areItemsTheSame(oldItem: Event, newItem: Event): Boolean = oldItem.id == newItem.id
-        override fun areContentsTheSame(oldItem: Event, newItem: Event): Boolean = oldItem == newItem
+    private object DiffCallback : DiffUtil.ItemCallback<MyEventItem>() {
+        override fun areItemsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem.event.id == newItem.event.id
+        override fun areContentsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem == newItem
     }
 }

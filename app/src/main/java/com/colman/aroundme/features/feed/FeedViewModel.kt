@@ -9,10 +9,11 @@ import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
 import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -48,10 +49,12 @@ data class FeedUiState(
 )
 
 class FeedViewModel(
-    private val repository: EventRepository
+    private val repository: EventRepository,
+    userRepository: UserRepository
 ) : ViewModel() {
 
     private val allEvents = repository.observeAll().asLiveData()
+    private val allUsers = userRepository.observeAll().asLiveData()
     private val uiStateSource = MediatorLiveData<FeedUiState>()
 
     private var sourceEvents: List<Event> = emptyList()
@@ -63,6 +66,7 @@ class FeedViewModel(
     private var userLocationLabel = DEFAULT_FEED_LOCATION_LABEL
     private var interactionCache: Map<String, EventVoteType?> = emptyMap()
     private var interactionSyncVersion: Long = 0L
+    private var sourceUsersById: Map<String, User> = emptyMap()
 
     val uiState: LiveData<FeedUiState> = uiStateSource
 
@@ -73,6 +77,10 @@ class FeedViewModel(
             viewModelScope.launch {
                 syncInteractionCache(events)
             }
+        }
+        uiStateSource.addSource(allUsers) { users ->
+            sourceUsersById = users.associateBy { it.id }
+            publishState()
         }
     }
 
@@ -184,10 +192,11 @@ class FeedViewModel(
     private fun Event.toFeedEventItem(userLocation: MapCoordinate): FeedEventItem {
         val distanceKm = distanceKm(userLocation, MapCoordinate(latitude, longitude))
         val selectedVote = interactionCache[id]
+        val hostUser = sourceUsersById[publisherId]
         return FeedEventItem(
             event = this,
-            hostName = publisherId.toFeedHandle(title),
-            hostSubtitle = category.ifBlank { "Event Host" },
+            hostName = hostUser.toFeedHostName(),
+            hostSubtitle = hostUser.toFeedHostSubtitle(category),
             locationText = locationName.ifBlank { "Unknown location" },
             distanceText = formatDistance(distanceKm),
             statusText = timeRemaining.ifBlank {
@@ -203,12 +212,14 @@ class FeedViewModel(
         )
     }
 
-    private fun formatAverageRating(averageRating: Double, ratingCount: Int): String {
-        return if (ratingCount <= 0) {
-            "New"
-        } else {
-            String.format(Locale.US, "%.1f★", averageRating)
-        }
+    private fun User?.toFeedHostName(): String {
+        return this?.displayName?.takeIf { it.isNotBlank() } ?: "Unknown Publisher"
+    }
+
+    private fun User?.toFeedHostSubtitle(fallbackCategory: String): String {
+        val user = this
+        return user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" }
+            ?: fallbackCategory.ifBlank { "Event Host" }
     }
 
     private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
@@ -250,6 +261,14 @@ class FeedViewModel(
         }
     }
 
+    private fun formatAverageRating(averageRating: Double, ratingCount: Int): String {
+        return if (ratingCount <= 0) {
+            "New"
+        } else {
+            String.format(Locale.US, "%.1f★", averageRating)
+        }
+    }
+
     private fun formatPostedTime(timestamp: Long): String {
         val elapsedMinutes = ((System.currentTimeMillis() - timestamp).coerceAtLeast(0L)) / 60000L
         return when {
@@ -260,24 +279,14 @@ class FeedViewModel(
         }
     }
 
-    private fun String.toFeedHandle(fallback: String): String {
-        val seed = ifBlank { fallback }
-        val cleaned = seed
-            .replace(Regex("[^A-Za-z0-9 ]"), " ")
-            .split(Regex("\\s+"))
-            .filter { it.isNotBlank() }
-            .joinToString(separator = "") { it.replaceFirstChar(Char::uppercaseChar) }
-            .ifBlank { "AroundMe" }
-        return "@$cleaned"
-    }
-
     class Factory(
-        private val repository: EventRepository
+        private val repository: EventRepository,
+        private val userRepository: UserRepository
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(FeedViewModel::class.java)) {
                 @Suppress("UNCHECKED_CAST")
-                return FeedViewModel(repository) as T
+                return FeedViewModel(repository, userRepository) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

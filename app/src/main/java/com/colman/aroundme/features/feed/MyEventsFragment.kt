@@ -7,11 +7,15 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.colman.aroundme.R
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 
 class MyEventsFragment : Fragment() {
 
@@ -19,7 +23,10 @@ class MyEventsFragment : Fragment() {
     private val binding get() = requireNotNull(_binding)
 
     private val viewModel: MyEventsViewModel by viewModels {
-        MyEventsViewModel.Factory(EventRepository.getInstance(requireContext()))
+        MyEventsViewModel.Factory(
+            EventRepository.getInstance(requireContext()),
+            UserRepository.getInstance(requireContext())
+        )
     }
 
     private val adapter by lazy {
@@ -28,6 +35,9 @@ class MyEventsFragment : Fragment() {
             onRecreateClick = ::openRecreateEvent
         )
     }
+
+    private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
+    private var userSyncJob: Job? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -40,6 +50,10 @@ class MyEventsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        userSyncJob?.cancel()
+        userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
+            userRepository.syncFromRemoteNow()
+        }
         binding.feedTitleText.text = getString(R.string.my_events_title)
         binding.sortInputLayout.isVisible = false
         binding.refreshButton.isVisible = false
@@ -48,6 +62,11 @@ class MyEventsFragment : Fragment() {
         binding.feedRecyclerView.adapter = adapter
 
         viewModel.events.observe(viewLifecycleOwner) { events ->
+            events.forEach { item ->
+                if (item.publisherDisplayName == "Unknown Publisher" && item.event.publisherId.isNotBlank()) {
+                    userRepository.refreshUserFromRemote(item.event.publisherId)
+                }
+            }
             adapter.submitList(events)
             binding.emptyText.isVisible = events.isEmpty()
             binding.emptyText.text = getString(R.string.my_events_empty)
@@ -71,9 +90,9 @@ class MyEventsFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        userSyncJob?.cancel()
         binding.feedRecyclerView.adapter = null
         _binding = null
         super.onDestroyView()
     }
 }
-

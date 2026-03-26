@@ -3,8 +3,8 @@ package com.colman.aroundme.data.repository
 import android.content.Context
 import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.local.dao.UserDao
-import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +31,7 @@ class UserRepository private constructor(
             try {
                 val list = firebase.fetchUsersSince(0L)
                 val found = list.firstOrNull { it.id == id }
-                found?.let { userDao.insert(it) }
+                found?.let { userDao.insert(it.normalizedForDisplay()) }
             } catch (_: Exception) {
                 // ignore
             }
@@ -39,9 +39,10 @@ class UserRepository private constructor(
     }
 
     suspend fun upsertUser(user: User, pushToRemote: Boolean = true) {
-        userDao.insert(user)
+        val normalized = user.normalizedForDisplay()
+        userDao.insert(normalized)
         if (pushToRemote) {
-            firebase.pushUser(user)
+            firebase.pushUser(normalized)
         }
     }
 
@@ -63,19 +64,29 @@ class UserRepository private constructor(
         userDao.deleteAll()
     }
 
-    fun syncFromRemote(since: Long = 0L) {
-        // Fire-and-forget background sync; simple implementation
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val remote = firebase.fetchUsersSince(since)
-                for (r in remote) {
-                    // write remote to local — Room handles update/replace
-                    userDao.insert(r)
-                }
-            } catch (e: Exception) {
-                // Log/ignore for now
+    suspend fun syncFromRemoteNow(since: Long = 0L) {
+        try {
+            val remote = firebase.fetchUsersSince(since)
+            for (user in remote) {
+                userDao.insert(user.normalizedForDisplay())
             }
+        } catch (_: Exception) {
+            // ignore best-effort sync failures
         }
+    }
+
+    fun syncFromRemote(since: Long = 0L) {
+        CoroutineScope(Dispatchers.IO).launch {
+            syncFromRemoteNow(since)
+        }
+    }
+
+    private fun User.normalizedForDisplay(): User {
+        val safeDisplayName = displayName.takeIf { it.isNotBlank() }
+            ?: username.takeIf { it.isNotBlank() }
+            ?: name.takeIf { it.isNotBlank() }
+            ?: "Unknown Publisher"
+        return copy(displayName = safeDisplayName)
     }
 
     companion object {
