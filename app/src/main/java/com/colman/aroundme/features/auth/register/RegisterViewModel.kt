@@ -19,7 +19,6 @@ class RegisterViewModel(
 ) : AndroidViewModel(application) {
 
     private val strings = RegisterStrings(
-        fullNameRequired = getString(R.string.error_full_name_required),
         emailRequired = getString(R.string.error_email_required),
         invalidEmail = getString(R.string.invalid_email),
         passwordRequired = getString(R.string.error_password_required),

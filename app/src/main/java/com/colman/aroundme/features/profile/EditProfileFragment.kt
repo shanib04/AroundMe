@@ -14,7 +14,6 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.colman.aroundme.databinding.FragmentEditProfileBinding
-import com.colman.aroundme.features.profile.ProfileViewModel
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import java.io.File
@@ -83,10 +82,9 @@ class EditProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Bio character counter
         binding.bioEditText.addTextChangedListener {
             val len = it?.length ?: 0
-            binding.bioCharCount.text = "$len/120"
+            binding.bioCharCount.text = getString(R.string.profile_bio_count_format, len, 120)
             if (len > 120) binding.bioEditText.error = "Bio too long"
         }
 
@@ -115,7 +113,6 @@ class EditProfileFragment : Fragment() {
             }
         }
 
-        viewModel.name.observe(viewLifecycleOwner) { name -> binding.nameEditText.setText(name) }
         viewModel.email.observe(viewLifecycleOwner) { email -> binding.emailEditText.setText(email) }
         viewModel.username.observe(viewLifecycleOwner) { username -> binding.usernameEditText.setText(username) }
         viewModel.displayName.observe(viewLifecycleOwner) { dn -> binding.displayNameEditText.setText(dn) }
@@ -128,7 +125,6 @@ class EditProfileFragment : Fragment() {
             binding.saveProgress.visibility = if (loading) View.VISIBLE else View.GONE
             binding.saveButton.isEnabled = !loading
             binding.deleteButton.isEnabled = !loading
-            binding.nameEditText.isEnabled = !loading
             binding.emailEditText.isEnabled = !loading
             binding.cameraFab.isEnabled = !loading
         }
@@ -160,18 +156,17 @@ class EditProfileFragment : Fragment() {
 
         binding.clearImageButton.setOnClickListener {
             tempImageUri = null
-            binding.editProfileImageView.setImageResource(com.colman.aroundme.R.drawable.ic_person_placeholder)
+            binding.editProfileImageView.setImageResource(R.drawable.ic_person_placeholder)
         }
 
         binding.saveButton.setOnClickListener {
-            val newName = binding.nameEditText.text?.toString().orEmpty()
             val newEmail = binding.emailEditText.text?.toString().orEmpty()
             val newUsername = binding.usernameEditText.text?.toString().orEmpty()
             val newDisplay = binding.displayNameEditText.text?.toString().orEmpty()
             val newBio = binding.bioEditText.text?.toString().orEmpty()
 
-            if (newName.isBlank()) {
-                binding.nameEditText.error = "Name required"
+            if (newDisplay.isBlank()) {
+                binding.displayNameEditText.error = "Display name required"
                 return@setOnClickListener
             }
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(newEmail).matches()) {
@@ -183,11 +178,6 @@ class EditProfileFragment : Fragment() {
             val usernameRegex = "^[a-z0-9_-]{1,15}$".toRegex()
             if (newUsername.isNotBlank() && !usernameRegex.matches(newUsername)) {
                 binding.usernameEditText.error = "Invalid username"
-                return@setOnClickListener
-            }
-
-            if (newDisplay.length > 20) {
-                binding.displayNameEditText.error = "Max 20 chars"
                 return@setOnClickListener
             }
 
@@ -206,7 +196,6 @@ class EditProfileFragment : Fragment() {
                 }
 
                 // update ViewModel fields
-                viewModel.setName(newName)
                 viewModel.setEmail(newEmail)
                 viewModel.setUsername(newUsername)
                 viewModel.setDisplayName(newDisplay)

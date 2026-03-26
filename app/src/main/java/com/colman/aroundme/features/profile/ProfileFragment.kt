@@ -5,19 +5,18 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.FragmentProfileBinding
-import com.colman.aroundme.features.profile.ProfileViewModel
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import androidx.navigation.fragment.findNavController
+import com.google.android.material.snackbar.Snackbar
 import java.text.NumberFormat
-import android.widget.TextView
 
 class ProfileFragment : Fragment() {
 
@@ -28,8 +27,6 @@ class ProfileFragment : Fragment() {
     private val viewModel: ProfileViewModel by viewModels {
         ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
     }
-
-    private var currentUserId: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,18 +49,11 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Attempt to get current Firebase user id
-        val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-        currentUserId = fbUser?.uid ?: "local_user"
-
-        // Observe and load inside try/catch to avoid runtime crashes
         try {
             observeViewModel()
-            viewModel.loadCurrentUser(currentUserId)
+            viewModel.loadCurrentUser()
 
-            // Only access binding if inflation succeeded
             if (_binding != null) {
-                // Toolbar navigation and menu
                 binding.toolbarProfile.setNavigationOnClickListener { findNavController().popBackStack() }
                 binding.toolbarProfile.inflateMenu(R.menu.menu_profile)
                 binding.toolbarProfile.setOnMenuItemClickListener { item ->
@@ -102,8 +92,7 @@ class ProfileFragment : Fragment() {
             }
         } catch (ex: Exception) {
             Log.e("ProfileFragment", "Error initializing profile UI", ex)
-            // If view is available, show snackbar; otherwise log
-            if (view != null) Snackbar.make(view, "Profile failed to load", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(view, "Profile failed to load", Snackbar.LENGTH_LONG).show()
         }
     }
 
@@ -189,6 +178,10 @@ class ProfileFragment : Fragment() {
                 lp.width = fillWidth
                 fill.layoutParams = lp
             }
+        }
+
+        viewModel.isValidator.observe(viewLifecycleOwner) { isValidator ->
+            b.validatorBadge.isVisible = isValidator
         }
     }
 

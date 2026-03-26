@@ -22,9 +22,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     private val eventRepo = EventRepository.getInstance(application)
     private val firebase by lazy { runCatching { FirebaseModel.getInstance() }.getOrNull() }
 
-    private val _name = MutableLiveData<String>("")
-    val name: LiveData<String> = _name
-
     private val _email = MutableLiveData<String>("")
     val email: LiveData<String> = _email
 
@@ -46,7 +43,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     private val _uploadProgress = MutableLiveData<Int>(0)
     val uploadProgress: LiveData<Int> = _uploadProgress
 
-    fun setName(v: String) { _name.value = v }
     fun setEmail(v: String) { _email.value = v }
     fun setUsername(v: String) { _username.value = v }
     fun setDisplayName(v: String) { _displayName.value = v }
@@ -57,7 +53,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
         viewModelScope.launch(Dispatchers.IO) {
             val user = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
             user?.let {
-                _name.postValue(it.name)
                 _email.postValue(it.email)
                 _username.postValue(it.username)
                 _displayName.postValue(it.displayName)
@@ -91,7 +86,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
                 val updated = User(
                     id = userId,
-                    name = _name.value.orEmpty(),
                     username = _username.value.orEmpty(),
                     displayName = _displayName.value.orEmpty(),
                     profileImageUrl = imageUrl,
@@ -117,7 +111,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                     val fb = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
                     fb?.let { fbUser ->
                         val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                            .setDisplayName(updated.name)
+                            .setDisplayName(updated.displayName)
                             .setPhotoUri(if (imageUrl.isNotBlank()) Uri.parse(imageUrl) else null)
                             .build()
                         // Use withContext to call updateProfile and then await if possible

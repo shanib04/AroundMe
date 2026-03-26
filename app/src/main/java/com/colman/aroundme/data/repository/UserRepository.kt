@@ -80,7 +80,6 @@ class UserRepository private constructor(
     private fun User.normalizedForDisplay(): User {
         val safeDisplayName = displayName.takeIf { it.isNotBlank() }
             ?: username.takeIf { it.isNotBlank() }
-            ?: name.takeIf { it.isNotBlank() }
             ?: com.colman.aroundme.features.feed.EventTextFormatter.unknownPublisherText()
         return copy(displayName = safeDisplayName)
     }

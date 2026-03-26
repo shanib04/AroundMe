@@ -16,8 +16,8 @@
     <string name="google_sign_in_token_missing">Google sign-in did not return an ID token.</string>
     <string name="register_title">Create Account</string>
     <string name="register_subtitle">Join the AroundMe community today!</string>
-    <string name="full_name_label">Full Name</string>
-    <string name="full_name_hint">John Doe</string>
+    <string name="display_name_label">Display Name</string>
+    <string name="display_name_hint">John Doe</string>
     <string name="email_label">Email</string>
     <string name="email_register_hint">hello@aroundme.com</string>
     <string name="username_hint">around_me_user</string>
@@ -35,7 +35,6 @@
     <string name="google_sign_up_failed">Google sign-up failed.</string>
     <string name="google_sign_up_cancelled">Google sign-up was cancelled.</string>
     <string name="register_success">Account created successfully.</string>
-    <string name="error_full_name_required">Full name is required.</string>
     <string name="error_email_required">Email is required.</string>
     <string name="error_password_required">Password is required.</string>
     <string name="error_confirm_password_required">Please confirm your password.</string>
@@ -93,8 +92,6 @@
     <string name="validations_count_placeholder">45</string>
     <string name="view_all">View all</string>
     <string name="email_or_username_hint">Email or Username</string>
-    <string name="display_name_label">Display Name</string>
-    <string name="username_label">Username</string>
     <string name="feed_sort_label">Sort: Trending</string>
     <string name="feed_subtitle">Fresh local moments, picked from your latest events.</string>
     <string name="feed_sort_distance">Distance</string>
@@ -134,4 +131,6 @@
     <string name="event_status_ended">Ended</string>
     <string name="event_rating_summary_empty">No ratings yet</string>
     <string name="map_showing_events_around_format">Showing events around %1$s</string>
+    <string name="profile_bio_count_format">%1$d/%2$d</string>
+    <string name="username_label">Username</string>
 </resources>

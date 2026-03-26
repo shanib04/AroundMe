@@ -8,21 +8,20 @@ class RegisterValidator(
     private val emailMatcher: (String) -> Boolean
 ) {
     fun validate(
-        fullName: String,
+        displayName: String,
         email: String,
         password: String,
         confirmPassword: String,
-        imageUri: Uri?
+        @Suppress("UNUSED_PARAMETER") imageUri: Uri?
     ): RegisterValidationResult {
-        // Treat fullName as displayName and synthesize a basic username
-        val displayName = fullName.trim()
-        val username = displayName
+        val safeDisplayName = displayName.trim()
+        val username = safeDisplayName
             .lowercase()
             .replace("[^a-z0-9_]".toRegex(), "_")
             .take(15)
 
         val helper = RegisterValidationHelper(strings, emailMatcher)
-        return helper.validateInputs(displayName, username, email, password, confirmPassword)
+        return helper.validateInputs(safeDisplayName, username, email, password, confirmPassword)
     }
 }
 

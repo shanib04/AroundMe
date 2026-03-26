@@ -4,7 +4,6 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.colman.aroundme.data.model.User
-import com.colman.aroundme.data.model.UserProfile
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -16,7 +15,6 @@ import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
 
-// Repository responsible for Firebase authentication operations.
 class AuthRepository(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance(),
@@ -38,7 +36,7 @@ class AuthRepository(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val authResult = firebaseAuth.signInWithCredential(credential).await()
         val user = authResult.user ?: error("Google sign-in succeeded, but no user data was returned.")
-        ensureGoogleUserProfile(user)
+        ensureGoogleUser(user)
         user
     }
 
@@ -48,10 +46,8 @@ class AuthRepository(
         email: String,
         password: String,
         imageUri: Uri?
-    ): Result<UserProfile> = runCatching {
+    ): Result<User> = runCatching {
         val normalizedUsername = username.lowercase()
-
-        // Ensure username is unique in Firestore
         val existing = firestore.collection(USERS_COLLECTION)
             .whereEqualTo("username", normalizedUsername)
             .get()
@@ -60,11 +56,9 @@ class AuthRepository(
             error("Username is already taken")
         }
 
-        // Create Auth user
         val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
         val user = authResult.user ?: error("Registration succeeded, but no user data was returned.")
 
-        // Upload profile image if provided
         var persistedImageSource = ""
         if (imageUri != null) {
             runCatching {
@@ -77,15 +71,12 @@ class AuthRepository(
             }
         }
 
-        // Update Firebase Auth profile for convenience
         runCatching {
             updateFirebaseUserProfile(user, displayName, persistedImageSource)
         }
 
-        // Build and persist Firestore/Room user document
         val userDoc = User(
             id = user.uid,
-            name = displayName,
             username = normalizedUsername,
             displayName = displayName,
             profileImageUrl = persistedImageSource,
@@ -99,15 +90,7 @@ class AuthRepository(
                 .await()
         }
 
-        // Maintain existing UserProfile shape for rest of app
-        val profile = UserProfile(
-            userId = user.uid,
-            fullName = displayName,
-            email = email,
-            imageUrl = persistedImageSource
-        )
-
-        mergeProfiles(profile, buildFallbackProfile(user.reloadAndReturnCurrent(), persistedImageSource))
+        userDoc
     }
 
     suspend fun loginWithIdentifierAndPassword(
@@ -116,11 +99,9 @@ class AuthRepository(
     ): Result<FirebaseUser> = runCatching {
         val trimmed = identifier.trim()
         if (trimmed.contains("@")) {
-            // Treat as email
             val authResult = firebaseAuth.signInWithEmailAndPassword(trimmed, password).await()
             authResult.user ?: error("Login succeeded, but no user data was returned.")
         } else {
-            // Treat as username: resolve to email via Firestore
             val normalizedUsername = trimmed.lowercase()
             val snapshot = firestore.collection(USERS_COLLECTION)
                 .whereEqualTo("username", normalizedUsername)
@@ -142,31 +123,16 @@ class AuthRepository(
         }
     }
 
-    suspend fun signInWithGoogleAndSyncProfile(idToken: String): Result<UserProfile> = runCatching {
+    suspend fun signInWithGoogleAndSyncProfile(idToken: String): Result<User> = runCatching {
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         val authResult = firebaseAuth.signInWithCredential(credential).await()
         val user = authResult.user ?: error("Google sign-up succeeded, but no user data was returned.")
-        ensureGoogleUserProfile(user)
+        ensureGoogleUser(user)
     }
 
-    suspend fun getCurrentUserProfile(): Result<UserProfile> = runCatching {
+    suspend fun getCurrentUserProfile(): Result<User> = runCatching {
         val user = firebaseAuth.currentUser ?: error("No signed-in user was found.")
-        val documentRef = firestore.collection(USERS_COLLECTION).document(user.uid)
-        val snapshot = try {
-            documentRef.get().await()
-        } catch (_: FirebaseFirestoreException) {
-            null
-        }
-
-        val firestoreProfile = snapshot?.toObject(UserProfile::class.java)
-        val fallbackProfile = buildFallbackProfile(user.reloadAndReturnCurrent(), firestoreProfile?.imageUrl)
-        val mergedProfile = mergeProfiles(firestoreProfile, fallbackProfile)
-
-        if (firestoreProfile == null || firestoreProfile.fullName.isBlank() || firestoreProfile.imageUrl.isBlank()) {
-            runCatching { saveUserProfile(mergedProfile) }
-        }
-
-        mergedProfile
+        ensureGoogleUser(user.reloadAndReturnCurrent())
     }
 
     private suspend fun uploadProfileImage(userId: String, imageUri: Uri): String {
@@ -175,44 +141,40 @@ class AuthRepository(
         return imageRef.downloadUrl.await().toString()
     }
 
-    private suspend fun updateFirebaseUserProfile(user: FirebaseUser, fullName: String, imageUrl: String) {
+    private suspend fun updateFirebaseUserProfile(user: FirebaseUser, displayName: String, imageUrl: String) {
         val profileBuilder = UserProfileChangeRequest.Builder()
-            .setDisplayName(fullName)
+            .setDisplayName(displayName)
         if (imageUrl.isNotBlank()) {
             profileBuilder.setPhotoUri(imageUrl.toUri())
         }
         user.updateProfile(profileBuilder.build()).await()
     }
 
-    private suspend fun saveUserProfile(profile: UserProfile) {
-        firestore.collection(USERS_COLLECTION)
-            .document(profile.userId)
-            .set(profile)
-            .await()
-    }
-
-    private suspend fun ensureGoogleUserProfile(user: FirebaseUser): UserProfile {
+    private suspend fun ensureGoogleUser(user: FirebaseUser): User {
         val documentRef = firestore.collection(USERS_COLLECTION).document(user.uid)
         val snapshot = try {
             documentRef.get().await()
         } catch (exception: FirebaseFirestoreException) {
             if (exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                return buildFallbackProfile(user)
+                return buildFallbackUser(user)
             }
             throw exception
         }
 
         if (snapshot.exists()) {
-            return mergeProfiles(snapshot.toObject(UserProfile::class.java), buildFallbackProfile(user, snapshot.getString("imageUrl")))
+            return mergeUsers(snapshot.toObject(User::class.java), buildFallbackUser(user, snapshot.getString("profileImageUrl")))
         }
 
-        val profile = buildFallbackProfile(user)
+        val profile = buildFallbackUser(user)
         return try {
-            saveUserProfile(profile)
+            firestore.collection(USERS_COLLECTION)
+                .document(user.uid)
+                .set(profile)
+                .await()
             profile
         } catch (exception: FirebaseFirestoreException) {
             if (exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
-                buildFallbackProfile(user)
+                buildFallbackUser(user)
             } else {
                 throw exception
             }
@@ -236,21 +198,30 @@ class AuthRepository(
         return Uri.fromFile(imageFile)
     }
 
-    private fun buildFallbackProfile(user: FirebaseUser, fallbackImageUrl: String? = null): UserProfile =
-        UserProfile(
-        userId = user.uid,
-        fullName = user.displayName.orEmpty(),
-        email = user.email.orEmpty(),
-        imageUrl = user.photoUrl?.toString().orEmpty().ifBlank { fallbackImageUrl.orEmpty() }
-    )
+    private fun buildFallbackUser(user: FirebaseUser, fallbackImageUrl: String? = null): User =
+        User(
+            id = user.uid,
+            username = user.email?.substringBefore('@')?.lowercase().orEmpty(),
+            displayName = user.displayName.orEmpty(),
+            email = user.email.orEmpty(),
+            profileImageUrl = user.photoUrl?.toString().orEmpty().ifBlank { fallbackImageUrl.orEmpty() }
+        )
 
-    private fun mergeProfiles(primary: UserProfile?, fallback: UserProfile): UserProfile =
-        UserProfile(
-        userId = primary?.userId?.ifBlank { fallback.userId } ?: fallback.userId,
-        fullName = primary?.fullName?.ifBlank { fallback.fullName } ?: fallback.fullName,
-        email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
-        imageUrl = primary?.imageUrl?.ifBlank { fallback.imageUrl } ?: fallback.imageUrl
-    )
+    private fun mergeUsers(primary: User?, fallback: User): User =
+        User(
+            id = primary?.id?.ifBlank { fallback.id } ?: fallback.id,
+            username = primary?.username?.ifBlank { fallback.username } ?: fallback.username,
+            displayName = primary?.displayName?.ifBlank { fallback.displayName } ?: fallback.displayName,
+            profileImageUrl = primary?.profileImageUrl?.ifBlank { fallback.profileImageUrl } ?: fallback.profileImageUrl,
+            email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
+            bio = primary?.bio.orEmpty(),
+            points = primary?.points ?: fallback.points,
+            totalPoints = primary?.totalPoints ?: fallback.totalPoints,
+            eventsPublishedCount = primary?.eventsPublishedCount ?: fallback.eventsPublishedCount,
+            validationsMadeCount = primary?.validationsMadeCount ?: fallback.validationsMadeCount,
+            rankTitle = primary?.rankTitle?.ifBlank { fallback.rankTitle } ?: fallback.rankTitle,
+            lastUpdated = maxOf(primary?.lastUpdated ?: 0L, fallback.lastUpdated)
+        )
 
     private fun String.toUri(): Uri = Uri.parse(this)
 
