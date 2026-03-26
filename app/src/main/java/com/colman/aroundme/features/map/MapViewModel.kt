@@ -26,7 +26,10 @@ data class MapFeaturedEventItem(
     val timeText: String
 )
 
-class MapViewModel(private val repository: EventRepository) : ViewModel() {
+class MapViewModel(
+    private val repository: EventRepository,
+    initialRadiusKm: Float = DEFAULT_RADIUS_KM
+) : ViewModel() {
 
     private val allEvents = repository.observeAll().asLiveData()
 
@@ -39,7 +42,7 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
     private val _selectedFilters = MutableLiveData<Set<String>>(emptySet())
     val selectedFilters: LiveData<Set<String>> = _selectedFilters
 
-    private val _radiusKm = MutableLiveData(DEFAULT_RADIUS_KM)
+    private val _radiusKm = MutableLiveData(initialRadiusKm)
     val radiusKm: LiveData<Float> = _radiusKm
 
     private val _searchCenter = MutableLiveData<MapCoordinate>(DEFAULT_SEARCH_CENTER)
@@ -170,10 +173,13 @@ class MapViewModel(private val repository: EventRepository) : ViewModel() {
         return "${"%.4f".format(center.latitude)}, ${"%.4f".format(center.longitude)}"
     }
 
-    class Factory(private val repository: EventRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: EventRepository,
+        private val initialRadiusKm: Float = DEFAULT_RADIUS_KM
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return MapViewModel(repository) as T
+            return MapViewModel(repository, initialRadiusKm) as T
         }
     }
 

@@ -181,6 +181,11 @@ class AuthRepository(
         }
     }
 
+    private suspend fun FirebaseUser.reloadAndReturnCurrent(): FirebaseUser {
+        runCatching { reload().await() }
+        return firebaseAuth.currentUser ?: this
+    }
+
     private fun copyImageToAppStorage(sourceUri: Uri, userId: String): Uri {
         if (sourceUri.scheme == ContentResolver.SCHEME_FILE) {
             return sourceUri
@@ -204,7 +209,8 @@ class AuthRepository(
             username = user.email?.substringBefore('@')?.lowercase().orEmpty(),
             displayName = user.displayName.orEmpty(),
             email = user.email.orEmpty(),
-            profileImageUrl = user.photoUrl?.toString().orEmpty().ifBlank { fallbackImageUrl.orEmpty() }
+            profileImageUrl = user.photoUrl?.toString().orEmpty().ifBlank { fallbackImageUrl.orEmpty() },
+            discoveryRadiusKm = 15
         )
 
     private fun mergeUsers(primary: User?, fallback: User): User =
@@ -214,9 +220,8 @@ class AuthRepository(
             displayName = primary?.displayName?.ifBlank { fallback.displayName } ?: fallback.displayName,
             profileImageUrl = primary?.profileImageUrl?.ifBlank { fallback.profileImageUrl } ?: fallback.profileImageUrl,
             email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
-            bio = primary?.bio.orEmpty(),
+            discoveryRadiusKm = primary?.discoveryRadiusKm ?: fallback.discoveryRadiusKm,
             points = primary?.points ?: fallback.points,
-            totalPoints = primary?.totalPoints ?: fallback.totalPoints,
             eventsPublishedCount = primary?.eventsPublishedCount ?: fallback.eventsPublishedCount,
             validationsMadeCount = primary?.validationsMadeCount ?: fallback.validationsMadeCount,
             rankTitle = primary?.rankTitle?.ifBlank { fallback.rankTitle } ?: fallback.rankTitle,
@@ -225,10 +230,6 @@ class AuthRepository(
 
     private fun String.toUri(): Uri = Uri.parse(this)
 
-    private suspend fun FirebaseUser.reloadAndReturnCurrent(): FirebaseUser {
-        runCatching { reload().await() }
-        return firebaseAuth.currentUser ?: this
-    }
 
     private companion object {
         const val USERS_COLLECTION = "Users"

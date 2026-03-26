@@ -82,10 +82,9 @@ class EditProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.bioEditText.addTextChangedListener {
-            val len = it?.length ?: 0
-            binding.bioCharCount.text = getString(R.string.profile_bio_count_format, len, 120)
-            if (len > 120) binding.bioEditText.error = "Bio too long"
+        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (currentUserId.isNotBlank()) {
+            viewModel.loadUser(currentUserId)
         }
 
         // Username inline validation: regex while typing, remote uniqueness on focus lost
@@ -116,7 +115,6 @@ class EditProfileFragment : Fragment() {
         viewModel.email.observe(viewLifecycleOwner) { email -> binding.emailEditText.setText(email) }
         viewModel.username.observe(viewLifecycleOwner) { username -> binding.usernameEditText.setText(username) }
         viewModel.displayName.observe(viewLifecycleOwner) { dn -> binding.displayNameEditText.setText(dn) }
-        viewModel.bio.observe(viewLifecycleOwner) { b -> binding.bioEditText.setText(b) }
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
             if (uri != null) Glide.with(this).load(uri).circleCrop().into(binding.editProfileImageView)
         }
@@ -163,7 +161,6 @@ class EditProfileFragment : Fragment() {
             val newEmail = binding.emailEditText.text?.toString().orEmpty()
             val newUsername = binding.usernameEditText.text?.toString().orEmpty()
             val newDisplay = binding.displayNameEditText.text?.toString().orEmpty()
-            val newBio = binding.bioEditText.text?.toString().orEmpty()
 
             if (newDisplay.isBlank()) {
                 binding.displayNameEditText.error = "Display name required"
@@ -181,12 +178,6 @@ class EditProfileFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            if (newBio.length > 120) {
-                binding.bioEditText.error = "Bio too long"
-                return@setOnClickListener
-            }
-
-            // Check username uniqueness
             lifecycleScope.launch {
                 val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                 val unique = if (newUsername.isBlank()) true else viewModel.isUsernameUniqueLocal(newUsername, currentId)
@@ -195,12 +186,9 @@ class EditProfileFragment : Fragment() {
                     return@launch
                 }
 
-                // update ViewModel fields
                 viewModel.setEmail(newEmail)
                 viewModel.setUsername(newUsername)
                 viewModel.setDisplayName(newDisplay)
-                viewModel.setBio(newBio)
-                // save; ViewModel handles threading
                 viewModel.saveProfile(currentId, tempImageUri) { ok, err ->
                     if (ok) Snackbar.make(binding.root, "Saved", Snackbar.LENGTH_SHORT).show()
                     else Snackbar.make(binding.root, "Save failed: $err", Snackbar.LENGTH_LONG).show()

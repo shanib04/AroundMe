@@ -10,14 +10,10 @@ data class User(
     val displayName: String = "",
     val profileImageUrl: String = "",
     val email: String = "",
-    val bio: String = "",
-
-    // Gamification & Achievements Fields
+    val discoveryRadiusKm: Int = 15,
     val points: Int = 0,
-    val totalPoints: Int = 0,
     val eventsPublishedCount: Int = 0,
     val validationsMadeCount: Int = 0,
     val rankTitle: String = "Newcomer",
-
     val lastUpdated: Long = System.currentTimeMillis() // For Room Sync
 )

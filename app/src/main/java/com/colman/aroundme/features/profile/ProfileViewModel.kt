@@ -6,6 +6,8 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
+import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
@@ -14,10 +16,10 @@ import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.text.NumberFormat
 import java.util.Locale
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
@@ -29,26 +31,22 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         runCatching { FirebaseModel.getInstance() }.getOrNull()
     }
 
-    private val _name = MutableLiveData("")
-    val name: LiveData<String> = _name
-
-    private val _email = MutableLiveData("")
-    val email: LiveData<String> = _email
+    private var currentUserId: String = ""
+    private var currentUser: User? = null
+    private var currentEvents: List<Event> = emptyList()
+    private var userObserverSource: LiveData<User?>? = null
+    private var userObserver: Observer<User?>? = null
+    private var eventObserverSource: LiveData<List<Event>>? = null
+    private var eventObserver: Observer<List<Event>>? = null
 
     private val _imageUri = MutableLiveData<Uri?>(null)
     val imageUri: LiveData<Uri?> = _imageUri
-
-    private val _handle = MutableLiveData("@")
-    val handle: LiveData<String> = _handle
 
     private val _username = MutableLiveData("")
     val username: LiveData<String> = _username
 
     private val _displayName = MutableLiveData("")
     val displayName: LiveData<String> = _displayName
-
-    private val _bio = MutableLiveData("")
-    val bio: LiveData<String> = _bio
 
     private val _isValidator = MutableLiveData(false)
     val isValidator: LiveData<Boolean> = _isValidator
@@ -89,32 +87,80 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _uploadProgress = MutableLiveData(0)
     val uploadProgress: LiveData<Int> = _uploadProgress
 
-    private val numberFormat = NumberFormat.getIntegerInstance(Locale.getDefault())
+    private val _completionPercentText = MutableLiveData("0% complete")
+    val completionPercentText: LiveData<String> = _completionPercentText
+
+    private val _pointsSummaryText = MutableLiveData("0 total points")
+    val pointsSummaryText: LiveData<String> = _pointsSummaryText
+
+    private var radiusSaveJob: kotlinx.coroutines.Job? = null
 
     fun loadCurrentUser() {
+        val authUser = authRepo.getCurrentUser()
+        val userId = authUser?.uid.orEmpty()
+        if (userId.isBlank()) {
+            clearObservers()
+            postEmptyProfile()
+            return
+        }
+        if (currentUserId == userId && userObserverSource != null && eventObserverSource != null) {
+            return
+        }
+
+        radiusSaveJob?.cancel()
+        clearObservers()
+        currentUserId = userId
+
+        userObserverSource = userRepo.getUserById(userId).asLiveData().also { source ->
+            val observer = Observer<User?> { user ->
+                currentUser = user
+                postUser(user)
+                computeStatsAndPost(currentEvents, user)
+            }
+            userObserver = observer
+            source.observeForever(observer)
+        }
+
+        eventObserverSource = eventRepo.observeEventsByPublisher(userId).also { source ->
+            val observer = Observer<List<Event>> { events ->
+                currentEvents = events
+                computeStatsAndPost(currentEvents, currentUser)
+            }
+            eventObserver = observer
+            source.observeForever(observer)
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val authUser = authRepo.getCurrentUser()
-                val userId = authUser?.uid.orEmpty()
-                if (userId.isBlank()) {
-                    postEmptyProfile()
-                    return@launch
+            val localUser = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
+            userRepo.refreshUserFromRemote(userId)
+            authFallbackUser(localUser)?.let { fallback ->
+                val hasIdentity = fallback.displayName.isNotBlank() || fallback.username.isNotBlank()
+                if (hasIdentity) {
+                    userRepo.upsertUser(fallback, pushToRemote = false)
                 }
-
-                userRepo.refreshUserFromRemote(userId)
-                val user = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
-                postUser(user, authUser?.email.orEmpty())
-
-                val events = eventRepo.observeEventsByPublisher(userId).value.orEmpty()
-                computeStatsAndPost(events, user)
-            } catch (ex: Exception) {
-                Log.e("ProfileViewModel", "Failed to load current user", ex)
-                postEmptyProfile()
             }
         }
     }
 
-    fun setRadiusKm(value: Int) { _radiusKm.value = value }
+    fun setRadiusKm(value: Int) {
+        _radiusKm.value = value
+        val userId = currentUserId
+        val existing = currentUser
+        if (userId.isBlank() || existing == null) return
+
+        val updated = existing.copy(
+            discoveryRadiusKm = value,
+            lastUpdated = System.currentTimeMillis()
+        )
+        currentUser = updated
+
+        radiusSaveJob?.cancel()
+        radiusSaveJob = viewModelScope.launch(Dispatchers.IO) {
+            runCatching { userRepo.upsertUser(updated, pushToRemote = false) }
+            delay(250)
+            runCatching { userRepo.upsertUser(updated, pushToRemote = true) }
+        }
+    }
 
     suspend fun isUsernameUnique(candidate: String, currentUserId: String): Boolean {
         val found = runCatching { userRepo.getUserByUsername(candidate) }.getOrNull()
@@ -124,12 +170,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     suspend fun isUsernameTakenRemotely(candidate: String, currentUserId: String): Boolean {
         return userRepo.isUsernameTakenRemote(candidate, currentUserId)
     }
-
-    fun setName(value: String) { _name.value = value }
-    fun setEmail(value: String) { _email.value = value }
-    fun setUsername(value: String) { _username.value = value }
-    fun setDisplayName(value: String) { _displayName.value = value }
-    fun setBio(value: String) { _bio.value = value }
 
     fun saveProfile(userId: String, tempImageUri: Uri?, onComplete: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -144,13 +184,19 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     }
                 }
 
+                val existing = currentUser
                 val updated = User(
                     id = userId,
                     username = _username.value.orEmpty(),
                     displayName = _displayName.value.orEmpty(),
-                    profileImageUrl = imageUrl,
-                    email = _email.value.orEmpty(),
-                    bio = _bio.value.orEmpty()
+                    profileImageUrl = imageUrl.ifBlank { existing?.profileImageUrl.orEmpty() },
+                    email = existing?.email.orEmpty(),
+                    discoveryRadiusKm = _radiusKm.value ?: existing?.discoveryRadiusKm ?: 15,
+                    points = existing?.points ?: 0,
+                    eventsPublishedCount = existing?.eventsPublishedCount ?: 0,
+                    validationsMadeCount = existing?.validationsMadeCount ?: 0,
+                    rankTitle = existing?.rankTitle ?: "Newcomer",
+                    lastUpdated = System.currentTimeMillis()
                 )
 
                 val candidate = updated.username
@@ -167,19 +213,19 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
                 runCatching {
                     authRepo.getCurrentUser()?.let { fbUser ->
-                        if (fbUser.displayName != updated.displayName || fbUser.photoUrl?.toString() != imageUrl) {
-                            runCatching {
-                                val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                                    .setDisplayName(updated.displayName)
-                                    .setPhotoUri(if (imageUrl.isNotBlank()) Uri.parse(imageUrl) else null)
-                                    .build()
-                                fbUser.updateProfile(req).await()
-                            }
+                        if (fbUser.displayName != updated.displayName || fbUser.photoUrl?.toString() != updated.profileImageUrl) {
+                            val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                .setDisplayName(updated.displayName)
+                                .setPhotoUri(updated.profileImageUrl.takeIf(String::isNotBlank)?.let(Uri::parse))
+                                .build()
+                            fbUser.updateProfile(req).await()
                         }
                     }
                 }
 
-                postUser(updated, updated.email)
+                currentUser = updated
+                postUser(updated)
+                computeStatsAndPost(currentEvents, updated)
                 _loading.postValue(false)
                 _uploadProgress.postValue(0)
                 onComplete(true, null)
@@ -195,6 +241,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun logout(onComplete: (Boolean) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                clearObservers()
                 runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() }
                 userRepo.clearAllLocal()
                 onComplete(true)
@@ -208,6 +255,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     fun deleteProfile(userId: String, onComplete: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                clearObservers()
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
                 userRepo.deleteUser(userId)
                 runCatching { firebase?.deleteUserAndEvents(userId) }
@@ -220,76 +268,157 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun postUser(user: User?, fallbackEmail: String) {
-        val safeDisplayName = user?.displayName?.takeIf { it.isNotBlank() } ?: ""
-        val safeUsername = user?.username?.trim().orEmpty()
-        _name.postValue(safeDisplayName)
-        _email.postValue(user?.email?.takeIf { it.isNotBlank() } ?: fallbackEmail)
+    private fun clearObservers() {
+        userObserverSource?.let { source -> userObserver?.let(source::removeObserver) }
+        eventObserverSource?.let { source -> eventObserver?.let(source::removeObserver) }
+        userObserverSource = null
+        userObserver = null
+        eventObserverSource = null
+        eventObserver = null
+        currentEvents = emptyList()
+        currentUser = null
+    }
+
+    private fun authFallbackUser(baseUser: User? = currentUser): User? {
+        val authUser = authRepo.getCurrentUser() ?: return null
+        val emailPrefix = authUser.email
+            ?.substringBefore('@')
+            ?.trim()
+            .orEmpty()
+        val authDisplayName = authUser.displayName
+            ?.trim()
+            .orEmpty()
+        val fallbackUsername = emailPrefix
+            .ifBlank {
+                authDisplayName
+                    .lowercase()
+                    .replace("[^a-z0-9_]+".toRegex(), "_")
+                    .trim('_')
+            }
+            .ifBlank { "user_${authUser.uid.take(6)}" }
+        val fallbackDisplayName = authDisplayName
+            .ifBlank { fallbackUsername }
+
+        return User(
+            id = authUser.uid,
+            username = baseUser?.username?.takeIf { it.isNotBlank() } ?: fallbackUsername,
+            displayName = baseUser?.displayName?.takeIf { it.isNotBlank() } ?: fallbackDisplayName,
+            profileImageUrl = baseUser?.profileImageUrl?.takeIf { it.isNotBlank() }
+                ?: authUser.photoUrl?.toString().orEmpty(),
+            email = baseUser?.email?.takeIf { it.isNotBlank() } ?: authUser.email.orEmpty(),
+            discoveryRadiusKm = baseUser?.discoveryRadiusKm ?: 15,
+            points = baseUser?.points ?: 0,
+            eventsPublishedCount = baseUser?.eventsPublishedCount ?: 0,
+            validationsMadeCount = baseUser?.validationsMadeCount ?: 0,
+            rankTitle = baseUser?.rankTitle ?: "Newcomer",
+            lastUpdated = maxOf(baseUser?.lastUpdated ?: 0L, System.currentTimeMillis())
+        )
+    }
+
+    private fun postUser(user: User?) {
+        val resolvedUser = user ?: authFallbackUser()
+        val safeUsername = resolvedUser?.username
+            ?.trim()
+            .orEmpty()
+            .ifBlank { authFallbackUser()?.username.orEmpty() }
+        val safeDisplayName = resolvedUser?.displayName
+            ?.takeIf { it.isNotBlank() }
+            ?: authFallbackUser()?.displayName?.takeIf { it.isNotBlank() }
+            ?: safeUsername
+
         _username.postValue(safeUsername)
         _displayName.postValue(safeDisplayName)
-        _bio.postValue(user?.bio.orEmpty())
-        _handle.postValue(if (safeUsername.isNotBlank()) "@$safeUsername" else "")
-        _isValidator.postValue((user?.validationsMadeCount ?: 0) > 0)
-        if (!user?.profileImageUrl.isNullOrBlank()) {
-            runCatching { _imageUri.postValue(Uri.parse(user.profileImageUrl)) }
+        _isValidator.postValue((resolvedUser?.validationsMadeCount ?: 0) > 0)
+
+        val profileImageUrl = resolvedUser?.profileImageUrl.orEmpty()
+            .ifBlank { authFallbackUser()?.profileImageUrl.orEmpty() }
+        if (profileImageUrl.isNotBlank()) {
+            runCatching { _imageUri.postValue(Uri.parse(profileImageUrl)) }
         } else {
             _imageUri.postValue(null)
         }
+
+        _radiusKm.postValue(resolvedUser?.discoveryRadiusKm ?: 15)
     }
 
     private fun postEmptyProfile() {
-        _name.postValue("")
-        _email.postValue("")
-        _imageUri.postValue(null)
-        _handle.postValue("")
-        _username.postValue("")
-        _displayName.postValue("")
-        _bio.postValue("")
-        _isValidator.postValue(false)
+        val fallbackUser = authFallbackUser()
+        if (fallbackUser != null) {
+            postUser(fallbackUser)
+        } else {
+            _imageUri.postValue(null)
+            _username.postValue("")
+            _displayName.postValue("")
+            _isValidator.postValue(false)
+            _radiusKm.postValue(15)
+        }
         _userDegree.postValue("")
         _eventsCreated.postValue(0)
         _totalValidations.postValue(0)
         _influenceScore.postValue("0.0")
         _calculatedPoints.postValue(0)
+        _pointsSummaryText.postValue("0 total points")
+        _completionPercentText.postValue("0% complete")
         _progressPercent.postValue(0f)
         _levelLabel.postValue("LEVEL 1")
-        _progressText.postValue("")
+        _progressText.postValue("0 pts to Level 2")
         _achievements.postValue(emptyList())
     }
 
     private fun computeStatsAndPost(events: List<Event>, user: User?) {
-        val count = events.size
-        val sumActive = events.sumOf { it.activeVotes }
-        val sumInactive = events.sumOf { it.inactiveVotes }
-        val persistedPoints = user?.points ?: 0
-        val points = maxOf(persistedPoints, (count * 10) + (sumActive * 5) - (sumInactive * 2))
-        val influence = if (count > 0) (sumActive.toDouble() / count.toDouble()) else 0.0
-        val validations = maxOf(user?.validationsMadeCount ?: 0, sumActive)
-        val createdCount = maxOf(user?.eventsPublishedCount ?: 0, count)
+        val realEventCount = events.size
+        val realValidations = events.sumOf { it.activeVotes + it.inactiveVotes }
+        val points = maxOf(user?.points ?: 0, (realEventCount * 10) + (realValidations * 2))
+        val influence = if (realEventCount > 0) realValidations.toDouble() / realEventCount.toDouble() else 0.0
 
-        _eventsCreated.postValue(createdCount)
-        _totalValidations.postValue(validations)
+        _eventsCreated.postValue(realEventCount)
+        _totalValidations.postValue(realValidations)
         _calculatedPoints.postValue(points)
+        _pointsSummaryText.postValue("$points total points")
         _influenceScore.postValue(String.format(Locale.getDefault(), "%.1f", influence))
 
-        val nextLevelPoints = 250
-        val percent = if (nextLevelPoints > 0) (points % nextLevelPoints).toFloat() / nextLevelPoints.toFloat() else 0f
-        _progressPercent.postValue(percent.coerceIn(0f, 1f))
-        _progressText.postValue("${nextLevelPoints - (points % nextLevelPoints)} pts to Level ${(points / nextLevelPoints) + 2}")
-        _levelLabel.postValue("LEVEL ${(points / nextLevelPoints) + 1}")
+        val completionScore = listOf(
+            user?.displayName?.isNotBlank() == true,
+            user?.username?.isNotBlank() == true,
+            user?.profileImageUrl?.isNotBlank() == true,
+            realEventCount > 0,
+            realValidations > 0
+        ).count { it }
+        val completionPercent = ((completionScore / 5f) * 100).toInt()
+        _completionPercentText.postValue("$completionPercent% complete")
+
+        val level = when {
+            points <= 100 -> 1
+            else -> ((points - 1) / 100) + 1
+        }
+        val levelStart = if (level == 1) 0 else ((level - 1) * 100) + 1
+        val levelEnd = level * 100
+        val pointsIntoLevel = (points - levelStart).coerceAtLeast(0)
+        val levelRange = (levelEnd - levelStart + 1).coerceAtLeast(1)
+        val pointsToNext = (levelEnd - points).coerceAtLeast(0)
+
+        _levelLabel.postValue("LEVEL $level")
+        _progressPercent.postValue((pointsIntoLevel.toFloat() / levelRange.toFloat()).coerceIn(0f, 1f))
+        _progressText.postValue("$pointsToNext pts to Level ${level + 1}")
 
         val degree = user?.rankTitle?.takeIf { it.isNotBlank() } ?: when {
-            points <= 50 -> "Local Scout"
-            points <= 200 -> "Active Explorer"
+            points <= 100 -> "Local Scout"
+            points <= 300 -> "Active Explorer"
             else -> "Community Pillar"
         }
         _userDegree.postValue(degree)
 
         val achievements = buildList {
-            if (createdCount > 0) add("Event Creator")
-            if (validations > 0) add("Community Validator")
+            if (realEventCount > 0) add("Event Creator")
+            if (realValidations > 0) add("Community Validator")
             if (points >= 100) add("Rising Local")
         }
         _achievements.postValue(achievements)
+    }
+
+    override fun onCleared() {
+        radiusSaveJob?.cancel()
+        clearObservers()
+        super.onCleared()
     }
 }

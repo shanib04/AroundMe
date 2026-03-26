@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     android:padding="16dp"
     android:background="@color/soft_surface"
-    tools:context=".ui.profile.ProfileFragment">
+    tools:context=".features.profile.ProfileFragment">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbarProfile"
@@ -18,7 +18,7 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         android:elevation="2dp"
-        android:title="Profile"
+        android:title="@string/profile_title"
         app:navigationIcon="@drawable/ic_arrow_back" />
 
     <androidx.core.widget.NestedScrollView
@@ -83,7 +83,7 @@
                 android:id="@+id/userDegreeText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Local Scout"
+                android:text="@string/profile_degree_default"
                 android:textSize="12sp"
                 android:paddingLeft="12dp"
                 android:paddingRight="12dp"
@@ -139,13 +139,13 @@
                             android:id="@+id/eventsCountText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0"
+                            android:text="@string/zero_text"
                             android:textStyle="bold"
                             android:textSize="20sp" />
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Events"
+                            android:text="@string/profile_events_label"
                             android:textSize="12sp"
                             android:textColor="@color/text_light" />
                     </LinearLayout>
@@ -170,13 +170,13 @@
                             android:id="@+id/validationsCountText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0"
+                            android:text="@string/zero_text"
                             android:textStyle="bold"
                             android:textSize="20sp" />
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Validations"
+                            android:text="@string/profile_validations_label"
                             android:textSize="12sp"
                             android:textColor="@color/text_light" />
                     </LinearLayout>
@@ -200,13 +200,13 @@
                             android:id="@+id/influenceText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="0.0"
+                            android:text="@string/zero_decimal_text"
                             android:textStyle="bold"
                             android:textSize="20sp" />
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Influence"
+                            android:text="@string/profile_influence_label"
                             android:textSize="12sp"
                             android:textColor="@color/text_light" />
                     </LinearLayout>
@@ -218,7 +218,7 @@
                 android:id="@+id/noPostsPlaceholder"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Start sharing to earn points!"
+                android:text="@string/profile_no_posts_message"
                 android:textAlignment="center"
                 android:textSize="16sp"
                 android:textColor="@color/text_light"
@@ -293,7 +293,7 @@
                                 android:id="@+id/pointsValueText"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="0"
+                                android:text="@string/zero_text"
                                 android:textSize="36sp"
                                 android:textStyle="bold"
                                 android:textColor="@color/text_dark" />
@@ -346,6 +346,31 @@
                                 android:text="@string/progress_right_text"
                                 android:textColor="@color/text_dark"
                                 android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <!-- New points summary and completion percent labels -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:layout_marginTop="4dp">
+
+                            <TextView
+                                android:id="@+id/pointsSummaryText"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/profile_points_summary_default"
+                                android:textColor="@color/text_dark"
+                                android:textSize="13sp" />
+
+                            <TextView
+                                android:id="@+id/completionPercentText"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/profile_completion_default"
+                                android:textColor="@color/text_dark"
+                                android:textSize="13sp" />
                         </LinearLayout>
 
                     </LinearLayout>

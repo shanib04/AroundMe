@@ -18,7 +18,7 @@ import androidx.room.TypeConverter
 
 @Database(
     entities = [User::class, Event::class, EventInteraction::class],
-    version = 6,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -126,9 +126,8 @@ abstract class AppLocalDb : RoomDatabase() {
 
         private val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
-                // Add new columns bio and totalPoints to users
+                // Historical schema step: add legacy user profile/game fields used by older app versions.
                 database.execSQL("ALTER TABLE users ADD COLUMN bio TEXT DEFAULT ''")
-                // Add username and displayName columns
                 database.execSQL("ALTER TABLE users ADD COLUMN username TEXT DEFAULT ''")
                 database.execSQL("ALTER TABLE users ADD COLUMN displayName TEXT DEFAULT ''")
                 database.execSQL("ALTER TABLE users ADD COLUMN totalPoints INTEGER NOT NULL DEFAULT 0")
@@ -166,7 +165,6 @@ abstract class AppLocalDb : RoomDatabase() {
                         displayName TEXT NOT NULL DEFAULT '',
                         profileImageUrl TEXT NOT NULL DEFAULT '',
                         email TEXT NOT NULL DEFAULT '',
-                        bio TEXT NOT NULL DEFAULT '',
                         points INTEGER NOT NULL DEFAULT 0,
                         totalPoints INTEGER NOT NULL DEFAULT 0,
                         eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
@@ -180,7 +178,7 @@ abstract class AppLocalDb : RoomDatabase() {
                 database.execSQL(
                     """
                     INSERT OR REPLACE INTO users_new (
-                        id, name, username, displayName, profileImageUrl, email, bio,
+                        id, name, username, displayName, profileImageUrl, email,
                         points, totalPoints, eventsPublishedCount, validationsMadeCount,
                         rankTitle, lastUpdated
                     )
@@ -191,7 +189,6 @@ abstract class AppLocalDb : RoomDatabase() {
                         COALESCE(displayName, ''),
                         COALESCE(profileImageUrl, ''),
                         COALESCE(email, ''),
-                        COALESCE(bio, ''),
                         COALESCE(points, 0),
                         COALESCE(totalPoints, 0),
                         COALESCE(eventsPublishedCount, 0),
@@ -217,7 +214,6 @@ abstract class AppLocalDb : RoomDatabase() {
                         displayName TEXT NOT NULL DEFAULT '',
                         profileImageUrl TEXT NOT NULL DEFAULT '',
                         email TEXT NOT NULL DEFAULT '',
-                        bio TEXT NOT NULL DEFAULT '',
                         points INTEGER NOT NULL DEFAULT 0,
                         totalPoints INTEGER NOT NULL DEFAULT 0,
                         eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
@@ -231,7 +227,7 @@ abstract class AppLocalDb : RoomDatabase() {
                 database.execSQL(
                     """
                     INSERT OR REPLACE INTO users_new (
-                        id, username, displayName, profileImageUrl, email, bio,
+                        id, username, displayName, profileImageUrl, email,
                         points, totalPoints, eventsPublishedCount, validationsMadeCount,
                         rankTitle, lastUpdated
                     )
@@ -241,7 +237,6 @@ abstract class AppLocalDb : RoomDatabase() {
                         COALESCE(displayName, ''),
                         COALESCE(profileImageUrl, ''),
                         COALESCE(email, ''),
-                        COALESCE(bio, ''),
                         COALESCE(points, 0),
                         COALESCE(totalPoints, 0),
                         COALESCE(eventsPublishedCount, 0),
@@ -257,6 +252,106 @@ abstract class AppLocalDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS users_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        username TEXT NOT NULL DEFAULT '',
+                        displayName TEXT NOT NULL DEFAULT '',
+                        profileImageUrl TEXT NOT NULL DEFAULT '',
+                        email TEXT NOT NULL DEFAULT '',
+                        points INTEGER NOT NULL DEFAULT 0,
+                        totalPoints INTEGER NOT NULL DEFAULT 0,
+                        eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
+                        validationsMadeCount INTEGER NOT NULL DEFAULT 0,
+                        rankTitle TEXT NOT NULL DEFAULT 'Newcomer',
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+
+                database.execSQL(
+                    """
+                    INSERT OR REPLACE INTO users_new (
+                        id, username, displayName, profileImageUrl, email,
+                        points, totalPoints, eventsPublishedCount, validationsMadeCount,
+                        rankTitle, lastUpdated
+                    )
+                    SELECT
+                        id,
+                        COALESCE(username, ''),
+                        COALESCE(displayName, ''),
+                        COALESCE(profileImageUrl, ''),
+                        COALESCE(email, ''),
+                        COALESCE(points, 0),
+                        COALESCE(totalPoints, 0),
+                        COALESCE(eventsPublishedCount, 0),
+                        COALESCE(validationsMadeCount, 0),
+                        COALESCE(rankTitle, 'Newcomer'),
+                        COALESCE(lastUpdated, 0)
+                    FROM users
+                    """.trimIndent()
+                )
+
+                database.execSQL("DROP TABLE users")
+                database.execSQL("ALTER TABLE users_new RENAME TO users")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS users_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        username TEXT NOT NULL DEFAULT '',
+                        displayName TEXT NOT NULL DEFAULT '',
+                        profileImageUrl TEXT NOT NULL DEFAULT '',
+                        email TEXT NOT NULL DEFAULT '',
+                        points INTEGER NOT NULL DEFAULT 0,
+                        eventsPublishedCount INTEGER NOT NULL DEFAULT 0,
+                        validationsMadeCount INTEGER NOT NULL DEFAULT 0,
+                        rankTitle TEXT NOT NULL DEFAULT 'Newcomer',
+                        lastUpdated INTEGER NOT NULL DEFAULT 0
+                    )
+                    """.trimIndent()
+                )
+
+                database.execSQL(
+                    """
+                    INSERT OR REPLACE INTO users_new (
+                        id, username, displayName, profileImageUrl, email,
+                        points, eventsPublishedCount, validationsMadeCount,
+                        rankTitle, lastUpdated
+                    )
+                    SELECT
+                        id,
+                        COALESCE(username, ''),
+                        COALESCE(displayName, ''),
+                        COALESCE(profileImageUrl, ''),
+                        COALESCE(email, ''),
+                        COALESCE(points, 0),
+                        COALESCE(eventsPublishedCount, 0),
+                        COALESCE(validationsMadeCount, 0),
+                        COALESCE(rankTitle, 'Newcomer'),
+                        COALESCE(lastUpdated, 0)
+                    FROM users
+                    """.trimIndent()
+                )
+
+                database.execSQL("DROP TABLE users")
+                database.execSQL("ALTER TABLE users_new RENAME TO users")
+            }
+        }
+
+        private val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE users ADD COLUMN discoveryRadiusKm INTEGER NOT NULL DEFAULT 15")
+            }
+        }
+
         fun getInstance(context: Context): AppLocalDb {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -264,19 +359,19 @@ abstract class AppLocalDb : RoomDatabase() {
                     AppLocalDb::class.java,
                     "aroundme_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
-                    .addCallback(object : RoomDatabase.Callback() {
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+                    .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
                             db.execSQL(
                                 """
                                 INSERT OR REPLACE INTO users (
-                                    id, username, displayName, profileImageUrl, email, bio,
-                                    points, totalPoints, eventsPublishedCount, validationsMadeCount,
+                                    id, username, displayName, profileImageUrl, email,
+                                    discoveryRadiusKm, points, eventsPublishedCount, validationsMadeCount,
                                     rankTitle, lastUpdated
                                 ) VALUES (
-                                    'demo_publisher', 'aroundme', 'AroundMe Team', '', '', '',
-                                    0, 0, 0, 0, 'Newcomer', 0
+                                    'demo_publisher', 'aroundme', 'AroundMe Team', '', '',
+                                    15, 0, 0, 0, 'Newcomer', 0
                                 )
                                 """.trimIndent()
                             )

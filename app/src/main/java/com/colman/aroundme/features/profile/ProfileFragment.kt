@@ -84,10 +84,12 @@ class ProfileFragment : Fragment() {
                     }
                 }
                 // radius slider interaction
-                binding.radiusSlider.addOnChangeListener { _, value, _ ->
+                binding.radiusSlider.addOnChangeListener { _, value, fromUser ->
                     val km = value.toInt()
                     binding.radiusValueText.text = getString(R.string.map_radius_km_format, km)
-                    viewModel.setRadiusKm(km)
+                    if (fromUser) {
+                        viewModel.setRadiusKm(km)
+                    }
                 }
             }
         } catch (ex: Exception) {
@@ -97,61 +99,61 @@ class ProfileFragment : Fragment() {
     }
 
     private fun observeViewModel() {
-        val b = _binding ?: return
+        val profileBinding = _binding ?: return
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
-            if (uri != null) Glide.with(this).load(uri).circleCrop().into(b.profileImageView)
-            else b.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+            if (uri != null) Glide.with(this).load(uri).circleCrop().into(profileBinding.profileImageView)
+            else profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
         }
 
-        viewModel.name.observe(viewLifecycleOwner) { name ->
-            b.profileNameText.text = name.ifBlank { getString(R.string.profile_not_available) }
+        viewModel.displayName.observe(viewLifecycleOwner) { displayName ->
+            profileBinding.profileNameText.text = displayName.ifBlank { getString(R.string.profile_not_available) }
         }
 
-        viewModel.handle.observe(viewLifecycleOwner) { handle ->
-            b.profileHandleText.text = handle
+        viewModel.username.observe(viewLifecycleOwner) { username ->
+            profileBinding.profileHandleText.text = username.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
+            profileBinding.profileHandleText.isVisible = username.isNotBlank()
         }
 
         viewModel.userDegree.observe(viewLifecycleOwner) { degree ->
-            b.userDegreeText.text = degree
-            b.userDegreeText.isVisible = degree.isNotBlank()
+            profileBinding.userDegreeText.text = degree
+            profileBinding.userDegreeText.isVisible = degree.isNotBlank()
         }
 
         viewModel.eventsCreated.observe(viewLifecycleOwner) { count ->
-            b.eventsCountText.text = count.toString()
+            profileBinding.eventsCountText.text = count.toString()
             val hasPosts = count > 0
-            // show placeholder message when no posts, but always display the points card (green box)
-            b.noPostsPlaceholder.isVisible = !hasPosts
-            b.pointsCard.isVisible = true
+            profileBinding.noPostsPlaceholder.isVisible = !hasPosts
+            profileBinding.pointsCard.isVisible = true
         }
 
         viewModel.totalValidations.observe(viewLifecycleOwner) { total ->
-            b.validationsCountText.text = total.toString()
+            profileBinding.validationsCountText.text = total.toString()
         }
 
         viewModel.influenceScore.observe(viewLifecycleOwner) { inf ->
-            b.influenceText.text = inf
+            profileBinding.influenceText.text = inf
         }
 
         viewModel.calculatedPoints.observe(viewLifecycleOwner) { pts ->
-            b.pointsValueText.text = NumberFormat.getIntegerInstance().format(pts)
+            profileBinding.pointsValueText.text = NumberFormat.getIntegerInstance().format(pts)
         }
 
         viewModel.levelLabel.observe(viewLifecycleOwner) { level ->
-            b.levelPill.text = level
+            profileBinding.levelPill.text = level
         }
 
         viewModel.progressText.observe(viewLifecycleOwner) { txt ->
-            b.progressRightText.text = txt
+            profileBinding.progressRightText.text = txt
         }
 
         viewModel.achievements.observe(viewLifecycleOwner) { list ->
             // populate achievement captions safely
-            val l = list ?: emptyList()
-            val first = l.getOrNull(0) ?: ""
-            val second = l.getOrNull(1) ?: ""
-            val third = l.getOrNull(2) ?: ""
-            val row = b.achievementsRow
+            val achievements = list ?: emptyList()
+            val first = achievements.getOrNull(0) ?: ""
+            val second = achievements.getOrNull(1) ?: ""
+            val third = achievements.getOrNull(2) ?: ""
+            val row = profileBinding.achievementsRow
             if (row.childCount >= 3) {
                 val a1 = row.getChildAt(0)
                 val a2 = row.getChildAt(1)
@@ -181,7 +183,15 @@ class ProfileFragment : Fragment() {
         }
 
         viewModel.isValidator.observe(viewLifecycleOwner) { isValidator ->
-            b.validatorBadge.isVisible = isValidator
+            profileBinding.validatorBadge.isVisible = isValidator
+        }
+
+        viewModel.pointsSummaryText.observe(viewLifecycleOwner) { pointsText ->
+            profileBinding.pointsSummaryText.text = pointsText
+        }
+
+        viewModel.completionPercentText.observe(viewLifecycleOwner) { completionText ->
+            profileBinding.completionPercentText.text = completionText
         }
     }
 

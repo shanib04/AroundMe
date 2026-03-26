@@ -14,7 +14,6 @@ import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 class EditProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -22,32 +21,27 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     private val eventRepo = EventRepository.getInstance(application)
     private val firebase by lazy { runCatching { FirebaseModel.getInstance() }.getOrNull() }
 
-    private val _email = MutableLiveData<String>("")
+    private val _email = MutableLiveData("")
     val email: LiveData<String> = _email
 
-    private val _username = MutableLiveData<String>("")
+    private val _username = MutableLiveData("")
     val username: LiveData<String> = _username
 
-    private val _displayName = MutableLiveData<String>("")
+    private val _displayName = MutableLiveData("")
     val displayName: LiveData<String> = _displayName
-
-    private val _bio = MutableLiveData<String>("")
-    val bio: LiveData<String> = _bio
 
     private val _imageUri = MutableLiveData<Uri?>(null)
     val imageUri: LiveData<Uri?> = _imageUri
 
-    private val _loading = MutableLiveData<Boolean>(false)
+    private val _loading = MutableLiveData(false)
     val loading: LiveData<Boolean> = _loading
 
-    private val _uploadProgress = MutableLiveData<Int>(0)
+    private val _uploadProgress = MutableLiveData(0)
     val uploadProgress: LiveData<Int> = _uploadProgress
 
     fun setEmail(v: String) { _email.value = v }
     fun setUsername(v: String) { _username.value = v }
     fun setDisplayName(v: String) { _displayName.value = v }
-    fun setBio(v: String) { _bio.value = v }
-    fun setImageUri(uri: Uri?) { _imageUri.value = uri }
 
     fun loadUser(userId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -56,8 +50,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 _email.postValue(it.email)
                 _username.postValue(it.username)
                 _displayName.postValue(it.displayName)
-                _bio.postValue(it.bio)
-                if (!it.profileImageUrl.isNullOrBlank()) _imageUri.postValue(Uri.parse(it.profileImageUrl))
+                if (it.profileImageUrl.isNotBlank()) {
+                    _imageUri.postValue(Uri.parse(it.profileImageUrl))
+                }
             }
         }
     }
@@ -78,9 +73,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 var imageUrl = tempImageUri?.toString().orEmpty()
                 if (tempImageUri != null && tempImageUri.scheme != "http" && tempImageUri.scheme != "https") {
                     firebase?.let { f ->
-                        imageUrl = f.uploadImage(tempImageUri, "profile_images/$userId.jpg", { progress: Int ->
+                        imageUrl = f.uploadImage(tempImageUri, "profile_images/$userId.jpg") { progress: Int ->
                             _uploadProgress.postValue(progress)
-                        })
+                        }
                     }
                 }
 
@@ -89,11 +84,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                     username = _username.value.orEmpty(),
                     displayName = _displayName.value.orEmpty(),
                     profileImageUrl = imageUrl,
-                    email = _email.value.orEmpty(),
-                    bio = _bio.value.orEmpty()
+                    email = _email.value.orEmpty()
                 )
 
-                // remote uniqueness guard
                 val candidate = updated.username
                 if (candidate.isNotBlank()) {
                     val taken = userRepo.isUsernameTakenRemote(candidate, userId)
@@ -106,7 +99,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
                 userRepo.upsertUser(updated, pushToRemote = true)
 
-                // best-effort remote auth profile update
                 runCatching {
                     val fb = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
                     fb?.let { fbUser ->
@@ -114,10 +106,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                             .setDisplayName(updated.displayName)
                             .setPhotoUri(if (imageUrl.isNotBlank()) Uri.parse(imageUrl) else null)
                             .build()
-                        // Use withContext to call updateProfile and then await if possible
-                        runCatching {
-                            fbUser.updateProfile(req)
-                        }
+                        runCatching { fbUser.updateProfile(req) }
                     }
                 }
 

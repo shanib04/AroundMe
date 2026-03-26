@@ -133,4 +133,14 @@
     <string name="map_showing_events_around_format">Showing events around %1$s</string>
     <string name="profile_bio_count_format">%1$d/%2$d</string>
     <string name="username_label">Username</string>
+    <string name="profile_points_summary_default">0 total points</string>
+    <string name="profile_completion_default">0%% complete</string>
+    <string name="profile_no_posts_message">Start sharing to earn points!</string>
+    <string name="profile_events_label">Events</string>
+    <string name="profile_validations_label">Validations</string>
+    <string name="profile_influence_label">Influence</string>
+    <string name="profile_degree_default">Local Scout</string>
+    <string name="delete_profile_label">Delete Profile</string>
+    <string name="zero_text">0</string>
+    <string name="zero_decimal_text">0.0</string>
 </resources>
