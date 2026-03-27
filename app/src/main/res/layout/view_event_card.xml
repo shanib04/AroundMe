@@ -239,8 +239,8 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_event_active_check"
-                    app:tint="@color/energetic_teal" />
+                    android:src="@drawable/ic_vote_happening"
+                    app:tint="#2E7D32" />
 
                 <TextView
                     android:id="@+id/activeVotesText"
@@ -271,8 +271,8 @@
                     android:layout_width="22dp"
                     android:layout_height="22dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_event_inactive_flag"
-                    app:tint="@color/primary_coral" />
+                    android:src="@drawable/ic_vote_not_happening"
+                    app:tint="#C62828" />
 
                 <TextView
                     android:id="@+id/inactiveVotesText"
