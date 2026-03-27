@@ -152,4 +152,5 @@
     <string name="edit_profile_gallery">Gallery</string>
     <string name="edit_profile_username_hint">Choose your username</string>
     <string name="edit_profile_display_name_hint">How should people see you?</string>
+    <string name="back">Back</string>
 </resources>

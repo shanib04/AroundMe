@@ -4,435 +4,579 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/bg_event_details_screen"
+    android:background="@color/ds_surface"
     tools:context="com.colman.aroundme.features.event.EventDetailsFragment">
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/closeButton"
-        android:layout_width="52dp"
-        android:layout_height="52dp"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="20dp"
-        android:contentDescription="@string/event_details_close"
-        app:backgroundTint="@android:color/white"
-        app:cornerRadius="26dp"
-        app:icon="@drawable/ic_close_navy"
-        app:iconGravity="textStart"
-        app:iconPadding="0dp"
-        app:iconTint="@color/event_details_title"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:strokeColor="@color/map_panel_stroke"
-        app:strokeWidth="1dp" />
-
-    <ScrollView
+    <!-- Full-width glass top bar (flush to edges) -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/topBar"
         android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:clipToPadding="false"
-        android:fillViewport="true"
-        android:paddingStart="20dp"
-        android:paddingTop="88dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="32dp"
-        app:layout_constraintBottom_toBottomOf="parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="#B3FFFFFF"
+        app:cardCornerRadius="0dp"
+        app:cardElevation="0dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="16dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp">
+
+            <ImageButton
+                android:id="@+id/backButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@android:color/transparent"
+                android:contentDescription="@string/back"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/ds_on_surface_variant"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/screenTitle"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Event Details"
+                android:textColor="@color/ds_on_surface"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                app:layout_constraintBottom_toBottomOf="@id/backButton"
+                app:layout_constraintEnd_toStartOf="@+id/shareButton"
+                app:layout_constraintStart_toEndOf="@id/backButton"
+                app:layout_constraintTop_toTopOf="@id/backButton" />
+
+            <!-- Top bar share button -->
+            <ImageButton
+                android:id="@+id/btnShare"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:src="@drawable/ic_share"
+                app:tint="#5a5c5c"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollView"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="120dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/topBar">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_horizontal"
             android:orientation="vertical">
 
-            <com.google.android.material.card.MaterialCardView
+            <!-- Hero section (edge-to-edge) -->
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="309dp">
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/heroImage"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:scaleType="centerCrop"
+                    tools:src="@tools:sample/backgrounds/scenic" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/bg_event_details_hero_scrim" />
+            </FrameLayout>
+
+            <!-- Content container with overlap (-48dp) -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="#EBFFFFFF"
-                app:cardCornerRadius="40dp"
-                app:cardElevation="8dp">
+                android:layout_marginTop="-48dp"
+                android:orientation="vertical"
+                android:paddingHorizontal="20dp">
 
-                <LinearLayout
+                <!-- Event info card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/eventInfoCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
-                    <FrameLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="240dp">
-
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/headerImageView"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:scaleType="centerCrop"
-                            app:shapeAppearanceOverlay="@style/ShapeAppearance.AroundMe.ImageLarge"
-                            tools:src="@tools:sample/backgrounds/scenic" />
-
-                        <LinearLayout
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="18dp"
-                            android:layout_marginTop="18dp"
-                            android:background="@drawable/bg_live_check_badge"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingHorizontal="16dp"
-                            android:paddingVertical="10dp">
-
-                            <View
-                                android:layout_width="12dp"
-                                android:layout_height="12dp"
-                                android:background="@drawable/bg_live_dot" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:text="@string/event_details_live_check"
-                                android:textColor="@color/event_positive"
-                                android:textSize="14sp"
-                                android:textStyle="bold" />
-                        </LinearLayout>
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_gravity="bottom"
-                            android:background="@drawable/bg_event_image_scrim"
-                            android:orientation="vertical"
-                            android:paddingStart="18dp"
-                            android:paddingTop="56dp"
-                            android:paddingEnd="18dp"
-                            android:paddingBottom="18dp">
-
-                            <TextView
-                                android:id="@+id/locationTitleText"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:textColor="@android:color/white"
-                                android:textSize="18sp"
-                                android:textStyle="bold"
-                                tools:text="SoHo Pop-up Market" />
-
-                            <LinearLayout
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="8dp"
-                                android:gravity="center_vertical"
-                                android:orientation="horizontal">
-
-                                <ImageView
-                                    android:layout_width="18dp"
-                                    android:layout_height="18dp"
-                                    android:src="@drawable/ic_schedule_white" />
-
-                                <TextView
-                                    android:id="@+id/reportedTimeText"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:textColor="#E6FFFFFF"
-                                    android:textSize="14sp"
-                                    tools:text="Reported 20m ago" />
-                            </LinearLayout>
-                        </LinearLayout>
-                    </FrameLayout>
+                    app:cardBackgroundColor="@color/ds_surface_lowest"
+                    app:cardCornerRadius="32dp"
+                    app:cardElevation="8dp">
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center_horizontal"
                         android:orientation="vertical"
-                        android:paddingHorizontal="18dp"
-                        android:paddingTop="26dp"
-                        android:paddingBottom="8dp">
+                        android:padding="20dp">
 
-                        <FrameLayout
-                            android:layout_width="72dp"
-                            android:layout_height="72dp"
-                            android:background="@drawable/bg_question_bubble">
-
-                            <ImageView
-                                android:layout_width="32dp"
-                                android:layout_height="32dp"
-                                android:layout_gravity="center"
-                                android:src="@drawable/ic_help_bubble" />
-                        </FrameLayout>
-
-                        <TextView
-                            android:id="@+id/eventTitleText"
-                            android:layout_width="wrap_content"
+                        <HorizontalScrollView
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="20dp"
-                            android:text="@string/event_details_title_placeholder"
-                            android:textAlignment="center"
-                            android:textColor="@color/event_details_title"
-                            android:textSize="28sp"
-                            android:textStyle="bold" />
+                            android:overScrollMode="never"
+                            android:scrollbars="none">
+
+                            <com.google.android.material.chip.ChipGroup
+                                android:id="@+id/tagsChipGroup"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                app:chipSpacingHorizontal="8dp"
+                                app:chipSpacingVertical="8dp" />
+                        </HorizontalScrollView>
 
                         <TextView
-                            android:id="@+id/helpText"
+                            android:id="@+id/eventTitle"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:gravity="center"
-                            android:textAlignment="center"
-                            android:textColor="@color/event_details_subtitle"
-                            android:textSize="18sp"
-                            tools:text="Help 240 people know if they should come join the fun!" />
+                            android:textColor="@color/ds_on_surface"
+                            android:textSize="26sp"
+                            android:textStyle="bold"
+                            tools:text="Night Market &amp; Street Food" />
 
                         <LinearLayout
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="18dp"
-                            android:gravity="center"
+                            android:layout_marginTop="10dp"
+                            android:baselineAligned="false"
+                            android:gravity="center_vertical"
                             android:orientation="horizontal">
 
-                            <LinearLayout
+                            <RatingBar
+                                android:id="@+id/ratingBar"
+                                style="?android:attr/ratingBarStyleSmall"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:background="@drawable/pill_white_rounded"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingStart="12dp"
-                                android:paddingTop="10dp"
-                                android:paddingEnd="14dp"
-                                android:paddingBottom="10dp">
+                                android:isIndicator="false"
+                                android:numStars="5"
+                                android:rating="0"
+                                android:stepSize="0.5"
+                                android:progressTint="#FFD700" />
 
-                                <ImageView
-                                    android:layout_width="22dp"
-                                    android:layout_height="22dp"
-                                    android:contentDescription="@null"
-                                    android:src="@drawable/ic_event_live_pulse"
-                                    app:tint="@color/primary_coral" />
-
-                                <TextView
-                                    android:id="@+id/activeVotesCountText"
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:textColor="@color/text_dark"
-                                    android:textSize="16sp"
-                                    android:textStyle="bold"
-                                    tools:text="24" />
-                            </LinearLayout>
-
-                            <LinearLayout
+                            <TextView
+                                android:id="@+id/ratingValue"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="10dp"
-                                android:background="@drawable/pill_white_rounded"
-                                android:gravity="center_vertical"
-                                android:minHeight="44dp"
-                                android:orientation="horizontal"
-                                android:paddingStart="12dp"
-                                android:paddingTop="10dp"
-                                android:paddingEnd="14dp"
-                                android:paddingBottom="10dp">
+                                android:textColor="@color/ds_on_surface"
+                                android:textSize="14sp"
+                                android:textStyle="bold"
+                                tools:text="4.5" />
+
+                            <TextView
+                                android:id="@+id/ratingCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="10dp"
+                                android:textColor="@color/ds_on_surface_variant"
+                                android:textSize="12sp"
+                                tools:text="(128 Reviews)" />
+
+                            <View
+                                android:layout_width="0dp"
+                                android:layout_height="0dp"
+                                android:layout_weight="1" />
+
+                            <TextView
+                                android:id="@+id/rateHint"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Tap to rate"
+                                android:textColor="@color/ds_secondary"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Publisher card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/publisherCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    app:cardBackgroundColor="@color/ds_surface_lowest"
+                    app:cardCornerRadius="32dp"
+                    app:cardElevation="0dp">
+
+                    <androidx.constraintlayout.widget.ConstraintLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="16dp">
+
+                        <com.google.android.material.imageview.ShapeableImageView
+                            android:id="@+id/publisherAvatar"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:scaleType="centerCrop"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintTop_toTopOf="parent"
+                            app:shapeAppearanceOverlay="@style/CircleImageView"
+                            tools:src="@tools:sample/avatars" />
+
+                        <TextView
+                            android:id="@+id/publisherName"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/ds_on_surface"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            app:layout_constraintStart_toEndOf="@id/publisherAvatar"
+                            app:layout_constraintTop_toTopOf="@id/publisherAvatar"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            tools:text="Alex Rivera" />
+
+                        <TextView
+                            android:id="@+id/publisherHandle"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_marginTop="2dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="@color/ds_on_surface_variant"
+                            android:textSize="12sp"
+                            app:layout_constraintStart_toEndOf="@id/publisherAvatar"
+                            app:layout_constraintTop_toBottomOf="@id/publisherName"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            tools:text="@alex_r" />
+
+                        <com.google.android.material.chip.ChipGroup
+                            android:id="@+id/achievementsChipGroup"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="12dp"
+                            android:visibility="gone"
+                            app:chipSpacingHorizontal="8dp"
+                            app:chipSpacingVertical="8dp"
+                            app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintTop_toBottomOf="@id/publisherAvatar" />
+
+                    </androidx.constraintlayout.widget.ConstraintLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Location + Navigate -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    app:cardBackgroundColor="@color/ds_surface_lowest"
+                    app:cardCornerRadius="32dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="16dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:baselineAligned="false"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <FrameLayout
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:background="@drawable/bg_icon_circle_teal">
 
                                 <ImageView
-                                    android:layout_width="22dp"
-                                    android:layout_height="22dp"
+                                    android:layout_width="24dp"
+                                    android:layout_height="24dp"
+                                    android:layout_gravity="center"
                                     android:contentDescription="@null"
-                                    android:src="@drawable/ic_event_off_slash"
-                                    app:tint="#4B8CF7" />
+                                    android:src="@drawable/ic_location_pin"
+                                    app:tint="@color/ds_secondary" />
+                            </FrameLayout>
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_marginStart="12dp"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
 
                                 <TextView
-                                    android:id="@+id/inactiveVotesCountText"
-                                    android:layout_width="wrap_content"
+                                    android:id="@+id/locationName"
+                                    android:layout_width="match_parent"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginStart="8dp"
-                                    android:textColor="@color/text_dark"
-                                    android:textSize="16sp"
+                                    android:textColor="@color/ds_on_surface"
+                                    android:textSize="14sp"
                                     android:textStyle="bold"
-                                    tools:text="5" />
+                                    tools:text="Central Park, New York" />
+
+                                <TextView
+                                    android:id="@+id/locationSubtitle"
+                                    android:layout_width="match_parent"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="2dp"
+                                    android:textColor="@color/ds_on_surface_variant"
+                                    android:textSize="12sp"
+                                    tools:text="Entrance at 72nd St &amp; 5th Ave" />
                             </LinearLayout>
                         </LinearLayout>
 
-                        <TextView
-                            android:id="@+id/eventSubtitleText"
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/navigateButton"
                             android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:gravity="center"
-                            android:textAlignment="center"
-                            android:textColor="@color/event_details_subtitle"
-                            android:textSize="15sp"
-                            tools:text="Street vendors, music, and community energy all in one place." />
+                            android:layout_height="56dp"
+                            android:layout_marginTop="14dp"
+                            android:text="Navigate to Event"
+                            android:textAllCaps="false"
+                            android:textColor="@color/ds_on_primary"
+                            android:textStyle="bold"
+                            app:cornerRadius="28dp"
+                            app:icon="@drawable/ic_near_me"
+                            app:iconGravity="textStart"
+                            app:iconTint="@color/ds_on_primary"
+                            app:iconPadding="10dp"
+                            app:backgroundTint="@color/ds_primary" />
+
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- About -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:text="ABOUT EVENT"
+                    android:textAllCaps="true"
+                    android:textColor="@color/ds_on_surface_variant"
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.12"
+                    android:alpha="0.55" />
+
+                <TextView
+                    android:id="@+id/aboutText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="@color/ds_on_surface_variant"
+                    android:textSize="14sp"
+                    android:lineSpacingExtra="4dp"
+                    tools:text="Experience the best local street food, live jazz music, and handmade crafts..." />
+
+                <!-- Community Validation -->
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    app:cardBackgroundColor="@color/ds_surface_low"
+                    app:cardCornerRadius="32dp"
+                    app:cardElevation="0dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:padding="18dp">
 
                         <TextView
-                            android:id="@+id/ratingLabelText"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="20dp"
-                            android:text="@string/event_rating_label"
-                            android:textColor="@color/event_details_title"
-                            android:textSize="16sp"
+                            android:gravity="center"
+                            android:text="Is this still happening?"
+                            android:textColor="@color/ds_on_surface"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
 
                         <LinearLayout
-                            android:id="@+id/ratingStarsContainer"
-                            android:layout_width="wrap_content"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:baselineAligned="false"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/stillHappeningButton"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="64dp"
+                                android:layout_weight="1"
+                                android:text="Still Happening!"
+                                android:textAllCaps="false"
+                                android:textStyle="bold"
+                                android:textColor="@color/ds_secondary"
+                                app:cornerRadius="20dp"
+                                app:strokeColor="#3300666A"
+                                app:strokeWidth="2dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/endedButton"
+                                style="@style/Widget.Material3.Button.OutlinedButton"
+                                android:layout_width="0dp"
+                                android:layout_height="64dp"
+                                android:layout_marginStart="10dp"
+                                android:layout_weight="1"
+                                android:text="Ended / Inactive"
+                                android:textAllCaps="false"
+                                android:textStyle="bold"
+                                android:textColor="@color/ds_on_surface_variant"
+                                app:cornerRadius="20dp"
+                                app:strokeColor="#14B02500"
+                                app:strokeWidth="2dp" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
-                            android:gravity="center"
+                            android:baselineAligned="false"
                             android:orientation="horizontal">
 
                             <TextView
-                                android:id="@+id/star1Text"
-                                android:layout_width="wrap_content"
+                                android:id="@+id/confirmedText"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:paddingHorizontal="4dp"
-                                android:text="★"
-                                android:textColor="#D1D5DB"
-                                android:textSize="34sp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:textColor="@color/ds_secondary"
+                                android:textSize="11sp"
                                 android:textStyle="bold"
-                                android:contentDescription="@string/event_rating_star_content_description"
-                                tools:ignore="HardcodedText" />
+                                tools:text="42 confirmed" />
 
                             <TextView
-                                android:id="@+id/star2Text"
-                                android:layout_width="wrap_content"
+                                android:id="@+id/reportsText"
+                                android:layout_width="0dp"
                                 android:layout_height="wrap_content"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:paddingHorizontal="4dp"
-                                android:text="★"
-                                android:textColor="#D1D5DB"
-                                android:textSize="34sp"
+                                android:layout_weight="1"
+                                android:gravity="center"
+                                android:textColor="#b02500"
+                                android:textSize="11sp"
                                 android:textStyle="bold"
-                                android:contentDescription="@string/event_rating_star_content_description"
-                                tools:ignore="HardcodedText" />
-
-                            <TextView
-                                android:id="@+id/star3Text"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:paddingHorizontal="4dp"
-                                android:text="★"
-                                android:textColor="#D1D5DB"
-                                android:textSize="34sp"
-                                android:textStyle="bold"
-                                android:contentDescription="@string/event_rating_star_content_description"
-                                tools:ignore="HardcodedText" />
-
-                            <TextView
-                                android:id="@+id/star4Text"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:paddingHorizontal="4dp"
-                                android:text="★"
-                                android:textColor="#D1D5DB"
-                                android:textSize="34sp"
-                                android:textStyle="bold"
-                                android:contentDescription="@string/event_rating_star_content_description"
-                                tools:ignore="HardcodedText" />
-
-                            <TextView
-                                android:id="@+id/star5Text"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:clickable="true"
-                                android:focusable="true"
-                                android:paddingHorizontal="4dp"
-                                android:text="★"
-                                android:textColor="#D1D5DB"
-                                android:textSize="34sp"
-                                android:textStyle="bold"
-                                android:contentDescription="@string/event_rating_star_content_description"
-                                tools:ignore="HardcodedText" />
+                                tools:text="3 reports" />
                         </LinearLayout>
 
-                        <TextView
-                            android:id="@+id/ratingSummaryText"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textColor="@color/event_details_subtitle"
-                            android:textSize="14sp"
-                            tools:text="4.7 average • 18 ratings" />
-
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/tagsChipGroup"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="16dp"
-                            app:chipSpacingHorizontal="8dp"
-                            app:chipSpacingVertical="8dp" />
                     </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/stillHappeningButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="60dp"
-                        android:layout_marginStart="20dp"
-                        android:layout_marginTop="20dp"
-                        android:layout_marginEnd="20dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:paddingStart="20dp"
-                        android:paddingEnd="20dp"
-                        android:text="@string/event_details_still_happening"
-                        android:textAllCaps="false"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        app:backgroundTint="@color/event_positive"
-                        app:cornerRadius="22dp"
-                        app:icon="@drawable/ic_event_live_pulse"
-                        app:iconGravity="textStart"
-                        app:iconPadding="12dp"
-                        app:iconSize="20dp"
-                        app:iconTint="@android:color/white"
-                        app:rippleColor="#26FFFFFF" />
+                <!-- Nearby Essentials -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:orientation="vertical">
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/endedButton"
+                    <TextView
                         android:layout_width="match_parent"
-                        android:layout_height="60dp"
-                        android:layout_marginStart="20dp"
+                        android:layout_height="wrap_content"
+                        android:text="Nearby Essentials"
+                        android:textColor="@color/ds_on_surface"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="14dp"
+                        android:overScrollMode="never"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/filterParking"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:text="Parking"
+                                android:textAllCaps="false"
+                                android:textStyle="bold"
+                                android:textSize="12sp"
+                                app:cornerRadius="20dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/filterFood"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_marginStart="10dp"
+                                android:text="Food"
+                                android:textAllCaps="false"
+                                android:textStyle="bold"
+                                android:textSize="12sp"
+                                app:cornerRadius="20dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/filterGas"
+                                android:layout_width="wrap_content"
+                                android:layout_height="40dp"
+                                android:layout_marginStart="10dp"
+                                android:text="Gas Stations"
+                                android:textAllCaps="false"
+                                android:textStyle="bold"
+                                android:textSize="12sp"
+                                app:cornerRadius="20dp" />
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <ProgressBar
+                        android:id="@+id/nearbyLoading"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="14dp"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/nearbyEmpty"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:layout_marginEnd="20dp"
-                        android:layout_marginBottom="16dp"
-                        android:insetTop="0dp"
-                        android:insetBottom="0dp"
-                        android:paddingStart="20dp"
-                        android:paddingEnd="20dp"
-                        android:text="@string/event_details_ended"
-                        android:textAllCaps="false"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        app:backgroundTint="@color/event_negative"
-                        app:cornerRadius="22dp"
-                        app:icon="@drawable/ic_event_off_slash"
-                        app:iconGravity="textStart"
-                        app:iconPadding="12dp"
-                        app:iconSize="20dp"
-                        app:iconTint="@android:color/white"
-                        app:rippleColor="#26FFFFFF" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                        android:gravity="center"
+                        android:text="No places found"
+                        android:textColor="@color/ds_on_surface_variant"
+                        android:textSize="13sp"
+                        android:visibility="gone" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:background="@android:color/white"
-                android:paddingHorizontal="24dp"
-                android:paddingVertical="12dp"
-                android:text="@string/event_details_not_here"
-                android:textColor="@color/event_details_subtitle"
-                android:textSize="15sp"
-                android:textStyle="bold" />
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/nearbyRecycler"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:overScrollMode="never"
+                        android:clipToPadding="false"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="4dp"
+                        android:paddingBottom="4dp"
+                        tools:listitem="@layout/item_nearby_essential" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="24dp" />
+
+            </LinearLayout>
         </LinearLayout>
-    </ScrollView>
+
+    </androidx.core.widget.NestedScrollView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 
 // Repository pattern for User data
@@ -103,6 +104,10 @@ class UserRepository private constructor(
                     firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
                 }
             }
+    }
+
+    suspend fun getByIdNow(id: String): User? {
+        return userDao.getUserById(id).firstOrNull()
     }
 
     companion object {

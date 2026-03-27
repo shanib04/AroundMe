@@ -1,45 +1,54 @@
 package com.colman.aroundme.features.event
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.RatingBar
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
+import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
+import com.colman.aroundme.data.model.NearbyPlace
+import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.UserRepository
+import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.databinding.FragmentEventDetailsBinding
-import com.colman.aroundme.features.feed.EventTextFormatter
+import java.util.Locale
 
 class EventDetailsFragment : Fragment() {
 
     private var _binding: FragmentEventDetailsBinding? = null
-    private val binding: FragmentEventDetailsBinding?
-        get() = _binding
+    private val binding: FragmentEventDetailsBinding
+        get() = requireNotNull(_binding) { "FragmentEventDetailsBinding accessed outside of view lifecycle" }
 
-    // SafeArgs generated class may not be available in this environment; read from args bundle instead.
-    private val eventId: String
-        get() = arguments?.getString("eventId") ?: ""
+    private val args by lazy { EventDetailsFragmentArgs.fromBundle(requireArguments()) }
 
     private val viewModel: EventDetailsViewModel by viewModels {
-        EventDetailsViewModel.Factory(EventRepository.getInstance(requireContext()), eventId)
-    }
-
-    private val ratingStars by lazy {
-        listOf(
-            requireNotNull(binding).star1Text,
-            requireNotNull(binding).star2Text,
-            requireNotNull(binding).star3Text,
-            requireNotNull(binding).star4Text,
-            requireNotNull(binding).star5Text
+        EventDetailsViewModel.Factory(
+            eventId = args.eventId,
+            eventRepository = EventRepository.getInstance(requireContext()),
+            userRepository = UserRepository.getInstance(requireContext()),
+            placesRepository = PlacesRepository.getInstance(),
+            firebaseModel = FirebaseModel.getInstance()
         )
     }
+
+    private val nearbyAdapter by lazy {
+        NearbyEssentialsAdapter(::openPlace)
+    }
+
+    private var suppressRatingListener = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -47,117 +56,216 @@ class EventDetailsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentEventDetailsBinding.inflate(inflater, container, false)
-        return requireNotNull(binding).root
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        setupRecycler()
         bindActions()
-        bindRatingActions()
-        observeEvent()
-        observeVoteState()
-        observeSelectedVoteType()
-        observeRating()
+        observeViewModel()
+
+        // Default pill selection state
+        renderSelectedEssentials(viewModel.selectedEssentialsType.value ?: EventDetailsViewModel.EssentialsType.PARKING)
+    }
+
+    private fun setupRecycler() {
+        binding.nearbyRecycler.apply {
+            layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+            adapter = nearbyAdapter
+            itemAnimator = null
+        }
     }
 
     private fun bindActions() {
-        val binding = requireNotNull(binding)
-        binding.closeButton.setOnClickListener {
-            findNavController().navigateUp()
-        }
-        binding.stillHappeningButton.setOnClickListener {
-            submitVote(EventVoteType.ACTIVE, getString(R.string.event_details_vote_live))
-        }
-        binding.endedButton.setOnClickListener {
-            submitVote(EventVoteType.INACTIVE, getString(R.string.event_details_vote_ended))
-        }
-    }
+        binding.backButton.setOnClickListener { findNavController().navigateUp() }
 
-    private fun bindRatingActions() {
-        ratingStars.forEachIndexed { index, starView ->
-            val ratingValue = index + 1
-            starView.contentDescription = getString(R.string.event_rating_star_content_description, ratingValue)
-            starView.setOnClickListener {
-                viewModel.submitRating(ratingValue)
+        binding.btnShare.setOnClickListener {
+            val event = viewModel.event.value
+            if (event == null) {
+                Toast.makeText(requireContext(), R.string.event_details_not_found, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+            val shareText = "${event.title}\n${event.locationName}\nhttps://maps.google.com/?q=${event.latitude},${event.longitude}"
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, shareText)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.feed_share)))
+        }
+
+        binding.navigateButton.setOnClickListener {
+            val event = viewModel.event.value ?: return@setOnClickListener
+            openNavigation(event.latitude, event.longitude, event.title.ifBlank { event.locationName })
+        }
+
+        binding.stillHappeningButton.setOnClickListener {
+            viewModel.submitVote(EventVoteType.ACTIVE)
+        }
+
+        binding.endedButton.setOnClickListener {
+            viewModel.submitVote(EventVoteType.INACTIVE)
+        }
+
+        binding.filterParking.setOnClickListener { viewModel.loadNearby(EventDetailsViewModel.EssentialsType.PARKING) }
+        binding.filterFood.setOnClickListener { viewModel.loadNearby(EventDetailsViewModel.EssentialsType.FOOD) }
+        binding.filterGas.setOnClickListener { viewModel.loadNearby(EventDetailsViewModel.EssentialsType.GAS) }
+
+        binding.ratingBar.onRatingBarChangeListener = RatingBar.OnRatingBarChangeListener { _, rating, fromUser ->
+            if (!fromUser || suppressRatingListener) return@OnRatingBarChangeListener
+            val stars = rating.toDouble().coerceIn(1.0, 5.0)
+            viewModel.submitRating(stars)
         }
     }
 
-    private fun observeEvent() {
+    private fun observeViewModel() {
         viewModel.event.observe(viewLifecycleOwner) { event ->
-            val binding = binding ?: return@observe
             if (event == null) {
                 Toast.makeText(requireContext(), R.string.event_details_not_found, Toast.LENGTH_SHORT).show()
                 findNavController().navigateUp()
                 return@observe
             }
+            renderEvent(event)
+        }
 
-            binding.eventTitleText.text = event.title
-            binding.eventSubtitleText.text = event.description
-            binding.eventSubtitleText.isVisible = event.description.isNotBlank()
-            binding.locationTitleText.text = event.locationName
-            binding.reportedTimeText.text = EventTextFormatter.statusText(event)
-            binding.helpText.text = getString(R.string.event_details_help_text, event.activeVotes + event.inactiveVotes)
-            binding.activeVotesCountText.text = event.activeVotes.toString()
-            binding.inactiveVotesCountText.text = event.inactiveVotes.toString()
-            binding.ratingSummaryText.text = EventTextFormatter.ratingSummaryText(event)
+        viewModel.publisher.observe(viewLifecycleOwner) { user ->
+            renderPublisher(user)
+        }
 
-            binding.tagsChipGroup.removeAllViews()
-            EventTextFormatter.detailTagLabels(event.tags).forEach { tag ->
-                binding.tagsChipGroup.addView(EventTagChipBuilder.create(requireContext(), tag))
+        viewModel.myRating.observe(viewLifecycleOwner) { my ->
+            suppressRatingListener = true
+            binding.ratingBar.rating = (my ?: 0).toFloat()
+            suppressRatingListener = false
+        }
+
+        viewModel.isSubmittingVote.observe(viewLifecycleOwner) { submitting ->
+            binding.stillHappeningButton.isEnabled = !submitting
+            binding.endedButton.isEnabled = !submitting
+            binding.stillHappeningButton.alpha = if (submitting) 0.6f else 1f
+            binding.endedButton.alpha = if (submitting) 0.6f else 1f
+        }
+
+        viewModel.isSubmittingRating.observe(viewLifecycleOwner) { submitting ->
+            binding.ratingBar.isEnabled = !submitting
+            binding.rateHint.isVisible = !submitting
+            if (submitting) {
+                binding.rateHint.text = "Saving…"
+            } else {
+                binding.rateHint.text = "Tap to rate"
             }
+        }
 
-            Glide.with(this)
-                .load(event.imageUrl)
-                .centerCrop()
-                .into(binding.headerImageView)
+        viewModel.nearbyLoading.observe(viewLifecycleOwner) { loading ->
+            binding.nearbyLoading.isVisible = loading
+        }
+
+        viewModel.nearbyPlaces.observe(viewLifecycleOwner) { places ->
+            nearbyAdapter.submitList(places)
+            binding.nearbyEmpty.isVisible = places.isEmpty() && (viewModel.nearbyLoading.value != true)
+        }
+
+        viewModel.selectedEssentialsType.observe(viewLifecycleOwner) { type ->
+            renderSelectedEssentials(type)
+            nearbyAdapter.fallbackType = type
         }
     }
 
-    private fun observeVoteState() {
-        viewModel.isSubmittingVote.observe(viewLifecycleOwner) { isSubmitting ->
-            val binding = binding ?: return@observe
-            binding.stillHappeningButton.isEnabled = !isSubmitting
-            binding.endedButton.isEnabled = !isSubmitting
-            binding.stillHappeningButton.alpha = if (isSubmitting) 0.6f else 1f
-            binding.endedButton.alpha = if (isSubmitting) 0.6f else 1f
+    private fun renderEvent(event: Event) {
+        binding.eventTitle.text = event.title
+        binding.aboutText.text = event.description
+
+        // Location text: we don't have subtitle in model, keep a subtle variant line with coordinates
+        binding.locationName.text = event.locationName.ifBlank { getString(R.string.event_unknown_location) }
+        binding.locationSubtitle.text = if (event.locationName.isNotBlank()) {
+            "Entrance at ${String.format(Locale.US, "%.5f", event.latitude)}, ${String.format(Locale.US, "%.5f", event.longitude)}"
+        } else {
+            getString(R.string.event_unknown_location)
+        }
+
+        binding.confirmedText.text = "${event.activeVotes} confirmed"
+        binding.reportsText.text = "${event.inactiveVotes} reports"
+
+        if (event.ratingCount > 0) {
+            binding.ratingValue.text = String.format(Locale.US, "%.1f", event.averageRating)
+            binding.ratingCount.text = "(${event.ratingCount} Reviews)"
+        } else {
+            binding.ratingValue.text = "0.0"
+            binding.ratingCount.text = "(0 Reviews)"
+        }
+
+        // Tags
+        binding.tagsChipGroup.removeAllViews()
+        val tags = event.tags.takeIf { it.isNotEmpty() } ?: listOf(event.category).filter { it.isNotBlank() }
+        tags.forEach { tag ->
+            binding.tagsChipGroup.addView(EventTagChipBuilder.create(requireContext(), tag))
+        }
+
+        Glide.with(this)
+            .load(event.imageUrl)
+            .centerCrop()
+            .into(binding.heroImage)
+    }
+
+    private fun renderPublisher(user: User?) {
+        binding.publisherName.text = user?.displayName?.ifBlank { user.username } ?: getString(R.string.profile_not_available)
+        binding.publisherHandle.text = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
+
+        Glide.with(this)
+            .load(user?.profileImageUrl?.ifBlank { null })
+            .placeholder(R.drawable.ic_place_placeholder)
+            .error(R.drawable.ic_place_placeholder)
+            .centerCrop()
+            .into(binding.publisherAvatar)
+
+        // Achievements (dynamic, no hardcoding)
+        binding.achievementsChipGroup.removeAllViews()
+        val achievements = user?.achievements.orEmpty().map { it.trim() }.filter { it.isNotBlank() }
+        if (achievements.isEmpty()) {
+            binding.achievementsChipGroup.visibility = View.GONE
+        } else {
+            binding.achievementsChipGroup.visibility = View.VISIBLE
+            achievements.forEach { title ->
+                binding.achievementsChipGroup.addView(AchievementChipBuilder.create(requireContext(), title))
+            }
         }
     }
 
-    private fun observeSelectedVoteType() {
-        viewModel.selectedVoteType.observe(viewLifecycleOwner) { voteType ->
-            val binding = binding ?: return@observe
-            val activeSelected = voteType == EventVoteType.ACTIVE
-            val inactiveSelected = voteType == EventVoteType.INACTIVE
-            binding.stillHappeningButton.strokeWidth = if (activeSelected) 4 else 0
-            binding.endedButton.strokeWidth = if (inactiveSelected) 4 else 0
-            binding.stillHappeningButton.strokeColor = if (activeSelected) android.content.res.ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.white)) else null
-            binding.endedButton.strokeColor = if (inactiveSelected) android.content.res.ColorStateList.valueOf(ContextCompat.getColor(requireContext(), android.R.color.white)) else null
+    private fun renderSelectedEssentials(type: EventDetailsViewModel.EssentialsType) {
+        // Active: primary bg + onPrimary text. Inactive: surface-container-high + onSurfaceVariant.
+        val activeBg = requireContext().getColor(R.color.ds_secondary)
+        val activeText = requireContext().getColor(R.color.ds_on_secondary)
+        val inactiveBg = requireContext().getColor(R.color.ds_surface_container_high)
+        val inactiveText = requireContext().getColor(R.color.ds_on_surface_variant)
+
+        fun style(button: com.google.android.material.button.MaterialButton, selected: Boolean) {
+            button.setBackgroundColor(if (selected) activeBg else inactiveBg)
+            button.setTextColor(if (selected) activeText else inactiveText)
+        }
+
+        style(binding.filterParking, type == EventDetailsViewModel.EssentialsType.PARKING)
+        style(binding.filterFood, type == EventDetailsViewModel.EssentialsType.FOOD)
+        style(binding.filterGas, type == EventDetailsViewModel.EssentialsType.GAS)
+    }
+
+    private fun openNavigation(lat: Double, lng: Double, label: String) {
+        val encodedLabel = Uri.encode(label)
+        val geo = Uri.parse("geo:0,0?q=$lat,$lng($encodedLabel)")
+        val intent = Intent(Intent.ACTION_VIEW, geo)
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(requireContext(), R.string.map_navigation_unavailable, Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun observeRating() {
-        viewModel.selectedRating.observe(viewLifecycleOwner) { rating ->
-            renderSelectedRating(rating ?: 0)
+    private fun openPlace(place: NearbyPlace) {
+        val placeId = place.placeId
+        val uri = if (!placeId.isNullOrBlank()) {
+            Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(place.name)}&query_place_id=$placeId")
+        } else {
+            Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(place.name + " " + place.vicinity)}")
         }
-    }
-
-    private fun renderSelectedRating(selectedRating: Int) {
-        ratingStars.forEachIndexed { index, starView ->
-            val isSelected = index < selectedRating
-            starView.setTextColor(
-                ContextCompat.getColor(
-                    requireContext(),
-                    if (isSelected) R.color.primary_coral else android.R.color.darker_gray
-                )
-            )
-        }
-    }
-
-    private fun submitVote(voteType: EventVoteType, message: String) {
-        if (eventId.isBlank()) return
-        viewModel.submitVote(voteType)
-        Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+        startActivity(Intent(Intent.ACTION_VIEW, uri))
     }
 
     override fun onDestroyView() {

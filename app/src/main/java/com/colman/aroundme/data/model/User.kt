@@ -10,6 +10,7 @@ data class User(
     val displayName: String = "",
     val profileImageUrl: String = "",
     val email: String = "",
+    val achievements: List<String> = emptyList(),
     val discoveryRadiusKm: Int = 15,
     val points: Int = 0,
     val eventsPublishedCount: Int = 0,

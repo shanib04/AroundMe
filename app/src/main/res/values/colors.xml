@@ -73,4 +73,8 @@
     <color name="my_events_edit_button_text">#0B4DA3</color>
     <color name="my_events_recreate_button">#FFF1B8</color>
     <color name="my_events_recreate_button_text">#8A5A00</color>
+
+    <!-- Additional Colors -->
+    <color name="ds_primary_10">#1AAA2C32</color>
+    <color name="rating_yellow">#F0A11D</color>
 </resources>

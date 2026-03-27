@@ -18,7 +18,7 @@ import androidx.room.TypeConverter
 
 @Database(
     entities = [User::class, Event::class, EventInteraction::class],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -395,6 +395,13 @@ abstract class AppLocalDb : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // achievements stored as TEXT via Converters (List<String>)
+                database.execSQL("ALTER TABLE users ADD COLUMN achievements TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
         fun getInstance(context: Context): AppLocalDb {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -402,7 +409,18 @@ abstract class AppLocalDb : RoomDatabase() {
                     AppLocalDb::class.java,
                     "aroundme_db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(
+                        MIGRATION_1_2,
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7,
+                        MIGRATION_7_8,
+                        MIGRATION_8_9,
+                        MIGRATION_9_10,
+                        MIGRATION_10_11
+                    )
                     .addCallback(object : Callback() {
                         override fun onCreate(db: SupportSQLiteDatabase) {
                             super.onCreate(db)
@@ -410,9 +428,11 @@ abstract class AppLocalDb : RoomDatabase() {
                                 """
                                 INSERT OR REPLACE INTO users (
                                     id, username, displayName, profileImageUrl, email,
+                                    achievements,
                                     discoveryRadiusKm, points, eventsPublishedCount, validationsMadeCount, lastUpdated
                                 ) VALUES (
                                     'demo_publisher', 'aroundme', 'AroundMe Team', '', '',
+                                    '',
                                     15, 0, 0, 0, 0
                                 )
                                 """.trimIndent()

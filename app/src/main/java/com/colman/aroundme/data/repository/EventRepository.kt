@@ -7,20 +7,28 @@ import com.colman.aroundme.data.local.dao.EventDao
 import com.colman.aroundme.data.local.dao.EventInteractionDao
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventInteraction
+import com.colman.aroundme.data.model.EventRatingRecord
+import com.colman.aroundme.data.model.EventVoteRecord
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.remote.FirebaseModel
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 // Repository pattern for Event data
 class EventRepository private constructor(
     private val eventDao: EventDao,
     private val eventInteractionDao: EventInteractionDao,
     private val firebase: FirebaseModel,
-    private val identityRepository: IdentityRepository
+    private val identityRepository: IdentityRepository,
+    private val firestore: FirebaseFirestore
 ) {
 
     init {
@@ -39,6 +47,56 @@ class EventRepository private constructor(
 
     // Observe events for a specific publisher (LiveData from Room)
     fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
+
+    /**
+     * Real-time event details from Firestore.
+     * Uses snapshot listener and emits updates immediately as Flow.
+     */
+    fun getEventDetails(eventId: String): Flow<Event?> = callbackFlow {
+        val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
+            .document(eventId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) {
+                    Log.e(TAG, "getEventDetails listener error", err)
+                    trySend(null)
+                    return@addSnapshotListener
+                }
+                val event = snap?.toObject(Event::class.java)
+                trySend(event)
+                // Keep local cache warm for other screens
+                if (event != null) {
+                    CoroutineScope(Dispatchers.IO).launch { eventDao.insert(event) }
+                }
+            }
+
+        awaitClose { reg.remove() }
+    }
+
+    /**
+     * Real-time event list synchronization.
+     * Whenever events change in Firestore, we upsert to Room.
+     * Screens observing Room will update immediately.
+     */
+    fun startEventsRealtimeSync() {
+        if (eventsListListener != null) return
+
+        eventsListListener = firestore.collection(EVENTS_COLLECTION)
+            .addSnapshotListener { snaps, err ->
+                if (err != null) {
+                    Log.e(TAG, "events list listener error", err)
+                    return@addSnapshotListener
+                }
+                val events = snaps?.documents?.mapNotNull { it.toObject(Event::class.java) }.orEmpty()
+                CoroutineScope(Dispatchers.IO).launch {
+                    events.forEach { eventDao.insert(it) }
+                }
+            }
+    }
+
+    fun stopEventsRealtimeSync() {
+        eventsListListener?.remove()
+        eventsListListener = null
+    }
 
     suspend fun upsertEvent(event: Event, pushToRemote: Boolean = true) {
         eventDao.insert(event)
@@ -267,9 +325,53 @@ class EventRepository private constructor(
         return eventInteractionDao.getInteraction(eventId, identityRepository.getActorId())
     }
 
+    /**
+     * Voting transaction (toggle semantics) stored in Firestore:
+     * /events/{eventId}/votes/{userId} { voteType: "active"|"inactive" }
+     */
     suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
         val actorId = identityRepository.getActorId()
-        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        if (actorId.isBlank()) return null
+
+        val eventRef = firestore.collection(EVENTS_COLLECTION).document(eventId)
+        val voteRef = eventRef.collection(VOTES_SUBCOLLECTION).document(actorId)
+
+        firestore.runTransaction { tx ->
+            val eventSnap = tx.get(eventRef)
+            if (!eventSnap.exists()) return@runTransaction
+
+            val currentActive = (eventSnap.getLong("activeVotes") ?: 0L).toInt()
+            val currentInactive = (eventSnap.getLong("inactiveVotes") ?: 0L).toInt()
+
+            val voteSnap = tx.get(voteRef)
+            val existingVote = if (voteSnap.exists()) voteSnap.getString("voteType") else null
+            val requested = if (voteType == EventVoteType.ACTIVE) "active" else "inactive"
+
+            if (existingVote == requested) {
+                // No-op
+                return@runTransaction
+            }
+
+            var newActive = currentActive
+            var newInactive = currentInactive
+
+            // If switching vote, decrement previous
+            when (existingVote) {
+                "active" -> newActive = (newActive - 1).coerceAtLeast(0)
+                "inactive" -> newInactive = (newInactive - 1).coerceAtLeast(0)
+            }
+
+            // Increment requested
+            when (requested) {
+                "active" -> newActive += 1
+                "inactive" -> newInactive += 1
+            }
+
+            tx.update(eventRef, mapOf("activeVotes" to newActive, "inactiveVotes" to newInactive, "lastUpdated" to System.currentTimeMillis()))
+            tx.set(voteRef, EventVoteRecord(voteType = requested, updatedAt = System.currentTimeMillis()))
+        }.await()
+
+        // Keep local interaction cache in sync for the current user
         val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
         val updatedInteraction = EventInteraction(
             eventId = eventId,
@@ -279,22 +381,59 @@ class EventRepository private constructor(
             lastUpdated = System.currentTimeMillis()
         )
         eventInteractionDao.upsert(updatedInteraction)
-        return recalculateEventAggregates(currentEvent)
+
+        // Return updated event from local cache (may be updated by listener already)
+        return eventDao.getByIdNow(eventId)
     }
 
-    suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {
-        val normalizedRating = rating.coerceIn(1, 5)
+    /**
+     * Rating: /events/{eventId}/ratings/{userId} { score: Number }
+     * Transaction recalculates averageRating + ratingCount on event doc.
+     */
+    suspend fun submitRating(eventId: String, rating: Double): EventInteraction? {
         val actorId = identityRepository.getActorId()
+        if (actorId.isBlank()) return null
+
+        val normalized = rating.coerceIn(1.0, 5.0)
+        val eventRef = firestore.collection(EVENTS_COLLECTION).document(eventId)
+        val ratingRef = eventRef.collection(RATINGS_SUBCOLLECTION).document(actorId)
+
+        firestore.runTransaction { tx ->
+            val eventSnap = tx.get(eventRef)
+            if (!eventSnap.exists()) return@runTransaction
+
+            val currentAvg = eventSnap.getDouble("averageRating") ?: 0.0
+            val currentCount = (eventSnap.getLong("ratingCount") ?: 0L).toInt()
+
+            val existingSnap = tx.get(ratingRef)
+            val previousScore = if (existingSnap.exists()) {
+                existingSnap.getDouble("score") ?: 0.0
+            } else {
+                0.0
+            }
+
+            val newCount = if (previousScore == 0.0) currentCount + 1 else currentCount
+            val totalSum = currentAvg * currentCount
+            val newSum = if (previousScore == 0.0) totalSum + normalized else totalSum - previousScore + normalized
+            val newAvg = if (newCount == 0) 0.0 else newSum / newCount
+
+            tx.set(ratingRef, EventRatingRecord(score = normalized, updatedAt = System.currentTimeMillis()))
+            tx.update(eventRef, mapOf("averageRating" to newAvg, "ratingCount" to newCount, "lastUpdated" to System.currentTimeMillis()))
+        }.await()
+
+        // Local interaction cache
         val currentEvent = eventDao.getByIdNow(eventId) ?: return null
         val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
         val updatedInteraction = EventInteraction(
             eventId = eventId,
             actorId = actorId,
             voteType = existingInteraction?.voteType,
-            rating = normalizedRating,
+            rating = normalized.toInt().coerceIn(1, 5),
             lastUpdated = System.currentTimeMillis()
         )
         eventInteractionDao.upsert(updatedInteraction)
+
+        // best-effort local aggregate recompute
         recalculateEventAggregates(currentEvent)
         return updatedInteraction
     }
@@ -324,9 +463,15 @@ class EventRepository private constructor(
     companion object {
         private const val TAG = "EventRepository"
         private const val DEMO_PUBLISHER_ID = "demo_publisher"
+        private const val EVENTS_COLLECTION = "events"
+        private const val VOTES_SUBCOLLECTION = "votes"
+        private const val RATINGS_SUBCOLLECTION = "ratings"
 
         @Volatile
         private var INSTANCE: EventRepository? = null
+
+        @Volatile
+        private var eventsListListener: ListenerRegistration? = null
 
         fun getInstance(context: Context): EventRepository = INSTANCE ?: synchronized(this) {
             val db = AppLocalDb.getInstance(context)
@@ -334,7 +479,8 @@ class EventRepository private constructor(
                 eventDao = db.eventDao(),
                 eventInteractionDao = db.eventInteractionDao(),
                 firebase = FirebaseModel.getInstance(),
-                identityRepository = IdentityRepository(context)
+                identityRepository = IdentityRepository(context),
+                firestore = FirebaseFirestore.getInstance()
             )
             INSTANCE = repo
             repo

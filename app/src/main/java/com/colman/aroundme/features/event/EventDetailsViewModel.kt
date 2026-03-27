@@ -1,64 +1,187 @@
 package com.colman.aroundme.features.event
 
 import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.EventInteraction
 import com.colman.aroundme.data.model.EventVoteType
+import com.colman.aroundme.data.model.NearbyPlace
+import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.IdentityRepository
+import com.colman.aroundme.data.repository.PlacesRepository
+import com.colman.aroundme.data.repository.UserRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 class EventDetailsViewModel(
-    private val repository: EventRepository,
-    private val eventId: String
+    private val eventId: String,
+    private val eventRepository: EventRepository,
+    private val userRepository: UserRepository,
+    private val placesRepository: PlacesRepository,
+    private val firebaseModel: FirebaseModel
 ) : ViewModel() {
 
-    val event: LiveData<Event?> = repository.getEventById(eventId).asLiveData()
-    val interaction: LiveData<EventInteraction?> = repository.observeInteraction(eventId).asLiveData()
+    enum class EssentialsType(val placesType: String) {
+        PARKING("parking"),
+        FOOD("restaurant"),
+        GAS("gas_station")
+    }
+
+    private val placesCache = mutableMapOf<String, List<NearbyPlace>>()
+
+    private val _event = MutableLiveData<Event?>()
+    val event: LiveData<Event?> = _event
+
+    private val _publisher = MutableLiveData<User?>()
+    val publisher: LiveData<User?> = _publisher
+
     private val _isSubmittingVote = MutableLiveData(false)
     val isSubmittingVote: LiveData<Boolean> = _isSubmittingVote
-    private val _selectedRating = MediatorLiveData<Int>().apply {
-        addSource(interaction) { value = it?.rating ?: 0 }
+
+    private val _nearbyLoading = MutableLiveData(false)
+    val nearbyLoading: LiveData<Boolean> = _nearbyLoading
+
+    private val _nearbyPlaces = MutableLiveData<List<NearbyPlace>>(emptyList())
+    val nearbyPlaces: LiveData<List<NearbyPlace>> = _nearbyPlaces
+
+    private val _nearbyError = MutableLiveData<String?>(null)
+    val nearbyError: LiveData<String?> = _nearbyError
+
+    private val _selectedEssentialsType = MutableLiveData(EssentialsType.PARKING)
+    val selectedEssentialsType: LiveData<EssentialsType> = _selectedEssentialsType
+
+    private val _myRating = MutableLiveData<Int?>(null)
+    val myRating: LiveData<Int?> = _myRating
+
+    private val _isSubmittingRating = MutableLiveData(false)
+    val isSubmittingRating: LiveData<Boolean> = _isSubmittingRating
+
+    private var eventJob: Job? = null
+
+    init {
+        observeEventRealtime()
+        observeMyInteraction()
     }
-    val selectedRating: LiveData<Int> = _selectedRating
-    private val _selectedVoteType = MediatorLiveData<EventVoteType?>().apply {
-        addSource(interaction) { value = it?.voteType }
+
+    private fun observeMyInteraction() {
+        // Keep myRating in sync with local interactions, so it survives navigation.
+        viewModelScope.launch {
+            eventRepository.observeInteraction(eventId).collectLatest { interaction ->
+                _myRating.value = interaction?.rating?.takeIf { it > 0 }
+            }
+        }
     }
-    val selectedVoteType: LiveData<EventVoteType?> = _selectedVoteType
+
+    private fun observeEventRealtime() {
+        eventJob?.cancel()
+        eventJob = viewModelScope.launch {
+            eventRepository.getEventDetails(eventId).collectLatest { e ->
+                _event.value = e
+                e?.let { ev ->
+                    // Load publisher (Room first, fallback remote)
+                    val roomUser = userRepository.getByIdNow(ev.publisherId)
+                    _publisher.value = roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+
+                    if (ev.latitude != 0.0 && ev.longitude != 0.0) {
+                        loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)
+                    }
+                }
+            }
+        }
+    }
 
     fun submitVote(voteType: EventVoteType) {
         if (_isSubmittingVote.value == true) return
-        _selectedVoteType.value = voteType
         viewModelScope.launch {
             _isSubmittingVote.value = true
             try {
-                repository.submitVote(eventId, voteType)
+                eventRepository.submitVote(eventId, voteType)
             } finally {
                 _isSubmittingVote.value = false
             }
         }
     }
 
-    fun submitRating(rating: Int) {
-        val normalized = rating.coerceIn(1, 5)
-        _selectedRating.value = normalized
+    /** rating passed from UI RatingBar (can be 0.5 steps). */
+    fun submitRating(rating: Double) {
+        if (_isSubmittingRating.value == true) return
+        if (rating !in 1.0..5.0) return
+
+        // optimistic UI
+        _myRating.value = rating.toInt()
+
         viewModelScope.launch {
-            repository.submitRating(eventId, normalized)
+            _isSubmittingRating.value = true
+            try {
+                eventRepository.submitRating(eventId, rating)
+                // observeMyInteraction() will update _myRating from DB, but keep it consistent here too.
+                _myRating.value = rating.toInt()
+            } finally {
+                _isSubmittingRating.value = false
+            }
+        }
+    }
+
+    fun loadNearby(type: EssentialsType) {
+        val currentEvent = _event.value ?: return
+        if (currentEvent.latitude == 0.0 && currentEvent.longitude == 0.0) return
+
+        _selectedEssentialsType.value = type
+
+        val cached = placesCache[type.placesType]
+        if (!cached.isNullOrEmpty()) {
+            _nearbyPlaces.value = cached
+            _nearbyError.value = null
+            _nearbyLoading.value = false
+            return
+        }
+
+        _nearbyLoading.value = true
+        _nearbyError.value = null
+
+        viewModelScope.launch {
+            val result = placesRepository.searchNearby(
+                latitude = currentEvent.latitude,
+                longitude = currentEvent.longitude,
+                radiusMeters = 1000,
+                type = type.placesType
+            )
+
+            result
+                .onSuccess { places ->
+                    placesCache[type.placesType] = places
+                    _nearbyPlaces.value = places
+                }
+                .onFailure { e ->
+                    _nearbyPlaces.value = emptyList()
+                    _nearbyError.value = e.message
+                }
+
+            _nearbyLoading.value = false
         }
     }
 
     class Factory(
-        private val repository: EventRepository,
-        private val eventId: String
+        private val eventId: String,
+        private val eventRepository: EventRepository,
+        private val userRepository: UserRepository,
+        private val placesRepository: PlacesRepository,
+        private val firebaseModel: FirebaseModel
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return EventDetailsViewModel(repository, eventId) as T
+            return EventDetailsViewModel(
+                eventId = eventId,
+                eventRepository = eventRepository,
+                userRepository = userRepository,
+                placesRepository = placesRepository,
+                firebaseModel = firebaseModel,
+            ) as T
         }
     }
 }
