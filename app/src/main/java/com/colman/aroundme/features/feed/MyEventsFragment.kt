@@ -57,7 +57,6 @@ class MyEventsFragment : Fragment() {
         }
         binding.feedTitleText.text = getString(R.string.my_events_title)
         binding.sortInputLayout.isVisible = false
-        binding.refreshButton.isVisible = false
         binding.loadingMoreIndicator.isVisible = false
         binding.feedRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.feedRecyclerView.adapter = adapter

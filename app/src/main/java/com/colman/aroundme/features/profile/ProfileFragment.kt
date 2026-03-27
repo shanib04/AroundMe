@@ -9,6 +9,7 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -17,9 +18,7 @@ import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.FragmentProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
-import java.text.DateFormat
 import java.text.NumberFormat
-import java.util.Date
 
 class ProfileFragment : Fragment() {
 
@@ -74,10 +73,20 @@ class ProfileFragment : Fragment() {
                                 .setNegativeButton("Cancel", null)
                                 .setPositiveButton("Logout") { _, _ ->
                                     viewModel.logout { ok ->
-                                        if (ok) {
-                                            val nav = findNavController()
-                                            nav.popBackStack(nav.graph.startDestinationId, false)
-                                            nav.navigate(R.id.loginFragment)
+                                        if (!isAdded) return@logout
+                                        requireActivity().runOnUiThread {
+                                            if (!isAdded) return@runOnUiThread
+                                            if (ok) {
+                                                findNavController().navigate(
+                                                    R.id.loginFragment,
+                                                    null,
+                                                    NavOptions.Builder()
+                                                        .setPopUpTo(R.id.nav_graph, true)
+                                                        .build()
+                                                )
+                                            } else {
+                                                Snackbar.make(binding.root, "Logout failed", Snackbar.LENGTH_LONG).show()
+                                            }
                                         }
                                     }
                                 }
@@ -151,7 +160,6 @@ class ProfileFragment : Fragment() {
         viewModel.calculatedPoints.observe(viewLifecycleOwner) { pts ->
             val formatted = NumberFormat.getIntegerInstance().format(pts)
             profileBinding.pointsValueText.text = formatted
-            profileBinding.pointsStatText.text = formatted
         }
 
         viewModel.levelLabel.observe(viewLifecycleOwner) { level ->
@@ -188,6 +196,10 @@ class ProfileFragment : Fragment() {
             profileBinding.validatorBadge.isVisible = isValidator
         }
 
+        viewModel.isReliableContributor.observe(viewLifecycleOwner) { isReliable ->
+            profileBinding.reliableBadge.isVisible = isReliable
+        }
+
         viewModel.pointsSummaryText.observe(viewLifecycleOwner) { pointsText ->
             profileBinding.pointsSummaryText.text = pointsText
         }
@@ -211,32 +223,19 @@ class ProfileFragment : Fragment() {
                 container.isVisible = false
                 container.contentDescription = null
                 container.setOnClickListener(null)
+                container.isClickable = false
+                container.isFocusable = false
             } else {
                 container.isVisible = true
                 iconView.text = achievement.icon
                 nameView.text = achievement.name
                 iconView.setBackgroundResource(backgroundForAchievement(achievement))
-                container.contentDescription = "${achievement.name}. ${achievement.description}"
-                container.setOnClickListener { showAchievementDetails(achievement) }
+                container.contentDescription = achievement.name
+                container.setOnClickListener(null)
+                container.isClickable = false
+                container.isFocusable = false
             }
         }
-    }
-
-    private fun showAchievementDetails(achievement: Achievement) {
-        val unlockedText = if (achievement.unlockedAt > 0L) {
-            getString(
-                R.string.achievement_unlocked_on_format,
-                DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(achievement.unlockedAt))
-            )
-        } else {
-            getString(R.string.achievement_recently_unlocked)
-        }
-
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(achievement.name.ifBlank { getString(R.string.achievement_details_title) })
-            .setMessage(listOf(achievement.description, unlockedText).filter { it.isNotBlank() }.joinToString("\n\n"))
-            .setPositiveButton(R.string.ok, null)
-            .show()
     }
 
     private fun backgroundForAchievement(achievement: Achievement): Int {

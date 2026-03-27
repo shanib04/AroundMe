@@ -18,7 +18,9 @@ interface EventInteractionDao {
     @Query("SELECT * FROM event_interactions WHERE eventId = :eventId AND actorId = :actorId LIMIT 1")
     fun observeInteraction(eventId: String, actorId: String): Flow<EventInteraction?>
 
+    @Query("SELECT COUNT(*) FROM event_interactions WHERE actorId = :actorId AND voteType IS NOT NULL")
+    suspend fun getValidationCountForActor(actorId: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(interaction: EventInteraction)
 }
-

@@ -98,7 +98,6 @@ class FeedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
         setupSortDropdown()
-        setupRefresh()
         observeViewModel()
         userSyncJob?.cancel()
         userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -126,16 +125,6 @@ class FeedFragment : Fragment() {
         }
     }
 
-    private fun setupRefresh() {
-        binding.refreshButton.setOnClickListener {
-            lifecycleScope.launch {
-                userRepository.syncFromRemoteNow()
-            }
-            viewModel.refresh()
-            requestLocationForDistance()
-        }
-    }
-
     private fun observeViewModel() {
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
             ensureUsersJob?.cancel()
@@ -158,8 +147,6 @@ class FeedFragment : Fragment() {
 
         eventAdapter.submitList(state.items)
         binding.loadingMoreIndicator.isVisible = state.isLoadingMore && state.items.isNotEmpty()
-        binding.refreshButton.alpha = if (state.isRefreshing) 0.5f else 1f
-        binding.refreshButton.isEnabled = !state.isRefreshing
         binding.emptyText.isVisible = state.items.isEmpty()
         binding.emptyText.text = state.emptyMessage
         binding.feedRecyclerView.isVisible = state.items.isNotEmpty()

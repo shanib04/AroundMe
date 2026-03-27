@@ -181,4 +181,6 @@
     <string name="achievement_details_title">Achievement details</string>
     <string name="achievement_unlocked_on_format">Unlocked on %1$s</string>
     <string name="ok">OK</string>
+    <string name="reliable_badge_checkmark">✓</string>
+    <string name="reliable_badge_content_description">Reliable contributor</string>
 </resources>

@@ -19,6 +19,7 @@ import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -37,10 +38,13 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var currentUserId: String = ""
     private var currentUser: User? = null
     private var currentEvents: List<Event> = emptyList()
+    private var knownUsers: List<User> = emptyList()
     private var userObserverSource: LiveData<User?>? = null
     private var userObserver: Observer<User?>? = null
     private var eventObserverSource: LiveData<List<Event>>? = null
     private var eventObserver: Observer<List<Event>>? = null
+    private var allUsersObserverSource: LiveData<List<User>>? = null
+    private var allUsersObserver: Observer<List<User>>? = null
 
     private val _imageUri = MutableLiveData<Uri?>(null)
     val imageUri: LiveData<Uri?> = _imageUri
@@ -53,6 +57,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isValidator = MutableLiveData(false)
     val isValidator: LiveData<Boolean> = _isValidator
+
+    private val _isReliableContributor = MutableLiveData(false)
+    val isReliableContributor: LiveData<Boolean> = _isReliableContributor
 
     private val _radiusKm = MutableLiveData(15)
     val radiusKm: LiveData<Int> = _radiusKm
@@ -93,7 +100,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _pointsSummaryText = MutableLiveData("0 total points")
     val pointsSummaryText: LiveData<String> = _pointsSummaryText
 
-    private var radiusSaveJob: kotlinx.coroutines.Job? = null
+    private var radiusSaveJob: Job? = null
+    private var statsComputationJob: Job? = null
 
     fun loadCurrentUser() {
         val authUser = authRepo.getCurrentUser()
@@ -121,6 +129,15 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                 computeStatsAndPost(currentEvents, user)
             }
             userObserver = observer
+            source.observeForever(observer)
+        }
+
+        allUsersObserverSource = userRepo.observeAll().asLiveData().also { source ->
+            val observer = Observer<List<User>> { users ->
+                knownUsers = users
+                computeStatsAndPost(currentEvents, currentUser)
+            }
+            allUsersObserver = observer
             source.observeForever(observer)
         }
 
@@ -278,12 +295,18 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private fun clearObservers() {
         userObserverSource?.let { source -> userObserver?.let(source::removeObserver) }
         eventObserverSource?.let { source -> eventObserver?.let(source::removeObserver) }
+        allUsersObserverSource?.let { source -> allUsersObserver?.let(source::removeObserver) }
         userObserverSource = null
         userObserver = null
         eventObserverSource = null
         eventObserver = null
+        allUsersObserverSource = null
+        allUsersObserver = null
         currentEvents = emptyList()
         currentUser = null
+        knownUsers = emptyList()
+        statsComputationJob?.cancel()
+        statsComputationJob = null
     }
 
     private fun authFallbackUser(baseUser: User? = currentUser): User? {
@@ -358,6 +381,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _isValidator.postValue(false)
             _radiusKm.postValue(15)
         }
+        _isReliableContributor.postValue(false)
         _eventsCreated.postValue(0)
         _totalValidations.postValue(0)
         _calculatedPoints.postValue(0)
@@ -371,65 +395,81 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun computeStatsAndPost(events: List<Event>, user: User?) {
-        val realEventCount = events.size
-        val realValidations = user?.validationsMadeCount ?: 0
-        val points = maxOf(user?.points ?: 0, (realEventCount * 10) + (realValidations * 2))
+        statsComputationJob?.cancel()
+        val requestedUserId = currentUserId
+        statsComputationJob = viewModelScope.launch(Dispatchers.IO) {
+            val actorId = authRepo.getCurrentUser()?.uid.orEmpty()
+            val derivedValidations = actorId.takeIf { it.isNotBlank() }
+                ?.let { runCatching { eventRepo.getValidationCountForActor(it) }.getOrDefault(0) }
+                ?: 0
+            val realEventCount = events.size
+            val safeUser = (user ?: authFallbackUser()) ?: User(id = requestedUserId)
+            val realValidations = maxOf(safeUser.validationsMadeCount, derivedValidations)
+            val points = calculatePoints(safeUser.points, realEventCount, realValidations)
+            val totalActiveVotes = events.sumOf { it.activeVotes }
+            val totalInactiveVotes = events.sumOf { it.inactiveVotes }
+            val isReliableContributor = realEventCount > 0 && totalActiveVotes > 0 && totalInactiveVotes == 0
 
-        _eventsCreated.postValue(realEventCount)
-        _totalValidations.postValue(realValidations)
-        _calculatedPoints.postValue(points)
-        _pointsSummaryText.postValue("$points total points")
+            val completionScore = listOf(
+                safeUser.displayName.isNotBlank(),
+                safeUser.username.isNotBlank(),
+                safeUser.profileImageUrl.isNotBlank(),
+                realEventCount > 0,
+                realValidations > 0
+            ).count { it }
+            val completionPercent = ((completionScore / 5f) * 100).toInt()
 
-        val completionScore = listOf(
-            user?.displayName?.isNotBlank() == true,
-            user?.username?.isNotBlank() == true,
-            user?.profileImageUrl?.isNotBlank() == true,
-            realEventCount > 0,
-            realValidations > 0
-        ).count { it }
-        val completionPercent = ((completionScore / 5f) * 100).toInt()
-        _completionPercentText.postValue("$completionPercent% complete")
+            val level = when {
+                points <= 100 -> 1
+                else -> ((points - 1) / 100) + 1
+            }
+            val levelStart = if (level == 1) 0 else ((level - 1) * 100) + 1
+            val levelEnd = level * 100
+            val pointsIntoLevel = (points - levelStart).coerceAtLeast(0)
+            val levelRange = (levelEnd - levelStart + 1).coerceAtLeast(1)
+            val pointsToNext = (levelEnd - points).coerceAtLeast(0)
 
-        val level = when {
-            points <= 100 -> 1
-            else -> ((points - 1) / 100) + 1
-        }
-        val levelStart = if (level == 1) 0 else ((level - 1) * 100) + 1
-        val levelEnd = level * 100
-        val pointsIntoLevel = (points - levelStart).coerceAtLeast(0)
-        val levelRange = (levelEnd - levelStart + 1).coerceAtLeast(1)
-        val pointsToNext = (levelEnd - points).coerceAtLeast(0)
+            val calculatedAchievements = calculateAchievements(
+                safeUser.copy(
+                    points = points,
+                    eventsPublishedCount = realEventCount,
+                    validationsMadeCount = realValidations
+                ),
+                events
+            )
+            val history = mergeAchievementHistory(
+                existingHistory = safeUser.achievementHistory,
+                currentAchievements = calculatedAchievements
+            )
 
-        _levelLabel.postValue("LEVEL $level")
-        _progressPercent.postValue((pointsIntoLevel.toFloat() / levelRange.toFloat()).coerceIn(0f, 1f))
-        _progressText.postValue("$pointsToNext pts to Level ${level + 1}")
+            if (requestedUserId != currentUserId) return@launch
 
-        val safeUser = (user ?: authFallbackUser()) ?: User()
-        val calculatedAchievements = calculateAchievements(
-            safeUser.copy(
-                points = points,
-                eventsPublishedCount = realEventCount,
-                validationsMadeCount = realValidations
-            ),
-            events
-        )
+            _eventsCreated.postValue(realEventCount)
+            _totalValidations.postValue(realValidations)
+            _calculatedPoints.postValue(points)
+            _pointsSummaryText.postValue("$points total points")
+            _isReliableContributor.postValue(isReliableContributor)
+            _completionPercentText.postValue("$completionPercent% complete")
+            _levelLabel.postValue("LEVEL $level")
+            _progressPercent.postValue((pointsIntoLevel.toFloat() / levelRange.toFloat()).coerceIn(0f, 1f))
+            _progressText.postValue("$pointsToNext pts to Level ${level + 1}")
+            _achievementHistory.postValue(history)
+            _achievements.postValue(history.take(3))
+            _isValidator.postValue(realValidations > 0)
 
-        val history = mergeAchievementHistory(
-            existingHistory = safeUser.achievementHistory,
-            currentAchievements = calculatedAchievements
-        )
-        _achievementHistory.postValue(history)
-        _achievements.postValue(history.take(3))
+            val statsChanged = safeUser.points != points ||
+                safeUser.eventsPublishedCount != realEventCount ||
+                safeUser.validationsMadeCount != realValidations
+            val historyChanged = safeUser.achievementHistory != history
 
-        if (safeUser.id.isNotBlank() && safeUser.achievementHistory != history) {
-            val updatedUser = safeUser.copy(
-                points = points,
-                eventsPublishedCount = realEventCount,
-                validationsMadeCount = realValidations,
-                lastUpdated = System.currentTimeMillis()
-            ).also { it.achievementHistory = history }
-            currentUser = updatedUser
-            viewModelScope.launch(Dispatchers.IO) {
+            if (safeUser.id.isNotBlank() && (statsChanged || historyChanged)) {
+                val updatedUser = safeUser.copy(
+                    points = points,
+                    eventsPublishedCount = realEventCount,
+                    validationsMadeCount = realValidations,
+                    lastUpdated = System.currentTimeMillis()
+                ).also { it.achievementHistory = history }
+                currentUser = updatedUser
                 runCatching { userRepo.updateUserProfile(updatedUser, pushToRemote = true) }
             }
         }
@@ -446,7 +486,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             .average()
             .takeIf { !it.isNaN() }
             ?: 0.0
-        val leaderboardPoints = maxOf(user.points, (postCount * 10) + (validations * 2))
+        val leaderboardPoints = calculatePoints(user.points, postCount, validations)
 
         val achievements = mutableListOf<Achievement>()
 
@@ -468,7 +508,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             )
         }
 
-        if (validations >= 100) {
+        if (validations >= 50) {
             achievements += achievement(
                 app.getString(R.string.achievement_oracle),
                 "🔮",
@@ -549,12 +589,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun isTopContributor(userId: String, currentPoints: Int): Boolean {
-        if (userId.isBlank()) return false
-        val allKnownUsers = listOfNotNull(currentUser)
-        val maxPoints = allKnownUsers.maxOfOrNull { existingUser ->
-            if (existingUser.id == userId) maxOf(existingUser.points, currentPoints) else existingUser.points
-        } ?: currentPoints
-        return currentPoints >= maxPoints
+        return qualifiesAsTopContributor(
+            userId = userId,
+            currentPoints = currentPoints,
+            leaderboardUsers = knownUsers
+        )
     }
 
     private fun achievement(name: String, icon: String, description: String): Achievement =
@@ -562,6 +601,37 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private fun buildProfileImageRemotePath(userId: String): String {
         return "profile_images/$userId/${System.currentTimeMillis()}.jpg"
+    }
+
+    companion object {
+        internal const val POINTS_PER_EVENT_CREATED = 10
+        internal const val POINTS_PER_VALIDATION = 2
+
+        internal fun calculatePoints(storedPoints: Int, eventCount: Int, validationCount: Int): Int {
+            return maxOf(storedPoints, (eventCount * POINTS_PER_EVENT_CREATED) + (validationCount * POINTS_PER_VALIDATION))
+        }
+
+        internal fun qualifiesAsTopContributor(
+            userId: String,
+            currentPoints: Int,
+            leaderboardUsers: List<User>
+        ): Boolean {
+            if (userId.isBlank() || currentPoints <= 0) return false
+            val distinctUsers = leaderboardUsers
+                .filter { it.id.isNotBlank() }
+                .distinctBy { it.id }
+            if (distinctUsers.size < 2) return false
+
+            val effectiveCurrentPoints = distinctUsers.firstOrNull { it.id == userId }
+                ?.let { maxOf(it.points, currentPoints) }
+                ?: currentPoints
+            val highestOtherPoints = distinctUsers
+                .filterNot { it.id == userId }
+                .maxOfOrNull { it.points }
+                ?: return false
+
+            return effectiveCurrentPoints >= highestOtherPoints
+        }
     }
 
     override fun onCleared() {
