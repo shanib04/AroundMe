@@ -5,7 +5,6 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -14,17 +13,19 @@ import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.colman.aroundme.R
+import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.FragmentProfileBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import java.text.DateFormat
 import java.text.NumberFormat
+import java.util.Date
 
 class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentProfileBinding accessed outside of onCreateView/onDestroyView" }
 
-    // Create AndroidViewModel using the AndroidViewModelFactory to ensure Application is provided
     private val viewModel: ProfileViewModel by viewModels {
         ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
     }
@@ -86,6 +87,9 @@ class ProfileFragment : Fragment() {
                         else -> false
                     }
                 }
+                binding.viewAllAchievementsText.setOnClickListener {
+                    findNavController().navigate(R.id.action_profileFragment_to_achievementsHistoryFragment)
+                }
                 // radius slider interaction
                 binding.radiusSlider.addOnChangeListener { _, value, fromUser ->
                     val km = value.toInt()
@@ -144,12 +148,10 @@ class ProfileFragment : Fragment() {
             profileBinding.validationsCountText.text = total.toString()
         }
 
-        viewModel.influenceScore.observe(viewLifecycleOwner) { inf ->
-            profileBinding.influenceText.text = inf
-        }
-
         viewModel.calculatedPoints.observe(viewLifecycleOwner) { pts ->
-            profileBinding.pointsValueText.text = NumberFormat.getIntegerInstance().format(pts)
+            val formatted = NumberFormat.getIntegerInstance().format(pts)
+            profileBinding.pointsValueText.text = formatted
+            profileBinding.pointsStatText.text = formatted
         }
 
         viewModel.levelLabel.observe(viewLifecycleOwner) { level ->
@@ -161,20 +163,7 @@ class ProfileFragment : Fragment() {
         }
 
         viewModel.achievements.observe(viewLifecycleOwner) { list ->
-            // populate achievement captions safely
-            val achievements = list ?: emptyList()
-            val first = achievements.getOrNull(0) ?: ""
-            val second = achievements.getOrNull(1) ?: ""
-            val third = achievements.getOrNull(2) ?: ""
-            val row = profileBinding.achievementsRow
-            if (row.childCount >= 3) {
-                val a1 = row.getChildAt(0)
-                val a2 = row.getChildAt(1)
-                val a3 = row.getChildAt(2)
-                (a1 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = first }
-                (a2 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = second }
-                (a3 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = third }
-            }
+            bindAchievementPreview(list.orEmpty())
         }
 
         viewModel.radiusKm.observe(viewLifecycleOwner) { km ->
@@ -205,6 +194,63 @@ class ProfileFragment : Fragment() {
 
         viewModel.completionPercentText.observe(viewLifecycleOwner) { completionText ->
             profileBinding.completionPercentText.text = completionText
+        }
+    }
+
+    private fun bindAchievementPreview(achievements: List<Achievement>) {
+        val binding = _binding ?: return
+        val slots = listOf(
+            Triple(binding.achievementSlotOne, binding.achievementOneIconText, binding.achievementOneNameText),
+            Triple(binding.achievementSlotTwo, binding.achievementTwoIconText, binding.achievementTwoNameText),
+            Triple(binding.achievementSlotThree, binding.achievementThreeIconText, binding.achievementThreeNameText)
+        )
+
+        slots.forEachIndexed { index, (container, iconView, nameView) ->
+            val achievement = achievements.getOrNull(index)
+            if (achievement == null) {
+                container.isVisible = false
+                container.contentDescription = null
+                container.setOnClickListener(null)
+            } else {
+                container.isVisible = true
+                iconView.text = achievement.icon
+                nameView.text = achievement.name
+                iconView.setBackgroundResource(backgroundForAchievement(achievement))
+                container.contentDescription = "${achievement.name}. ${achievement.description}"
+                container.setOnClickListener { showAchievementDetails(achievement) }
+            }
+        }
+    }
+
+    private fun showAchievementDetails(achievement: Achievement) {
+        val unlockedText = if (achievement.unlockedAt > 0L) {
+            getString(
+                R.string.achievement_unlocked_on_format,
+                DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(achievement.unlockedAt))
+            )
+        } else {
+            getString(R.string.achievement_recently_unlocked)
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(achievement.name.ifBlank { getString(R.string.achievement_details_title) })
+            .setMessage(listOf(achievement.description, unlockedText).filter { it.isNotBlank() }.joinToString("\n\n"))
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    private fun backgroundForAchievement(achievement: Achievement): Int {
+        val name = achievement.name.lowercase()
+        return when {
+            name.contains("rising") ||
+                name.contains("legend") ||
+                name.contains("fresh face") -> R.drawable.ach_bg_orange
+
+            name.contains("trustworthy") ||
+                name.contains("oracle") ||
+                name.contains("fact checker") -> R.drawable.ach_bg_blue
+
+            else -> R.drawable.ach_bg_purple
         }
     }
 

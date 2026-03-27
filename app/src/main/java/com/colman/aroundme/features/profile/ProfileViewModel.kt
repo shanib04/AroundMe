@@ -10,6 +10,8 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
+import com.colman.aroundme.R
+import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
@@ -21,10 +23,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import java.util.Locale
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val app = application
     private val userRepo = UserRepository.getInstance(application)
     private val eventRepo = EventRepository.getInstance(application)
     private val authRepo = AuthRepository()
@@ -55,12 +57,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _radiusKm = MutableLiveData(15)
     val radiusKm: LiveData<Int> = _radiusKm
 
-    private val _userDegree = MutableLiveData("")
-    val userDegree: LiveData<String> = _userDegree
-
-    private val _influenceScore = MutableLiveData("0.0")
-    val influenceScore: LiveData<String> = _influenceScore
-
     private val _totalValidations = MutableLiveData(0)
     val totalValidations: LiveData<Int> = _totalValidations
 
@@ -79,8 +75,11 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private val _progressText = MutableLiveData("")
     val progressText: LiveData<String> = _progressText
 
-    private val _achievements = MutableLiveData<List<String>>(emptyList())
-    val achievements: LiveData<List<String>> = _achievements
+    private val _achievements = MutableLiveData<List<Achievement>>(emptyList())
+    val achievements: LiveData<List<Achievement>> = _achievements
+
+    private val _achievementHistory = MutableLiveData<List<Achievement>>(emptyList())
+    val achievementHistory: LiveData<List<Achievement>> = _achievementHistory
 
     private val _loading = MutableLiveData(false)
     val loading: LiveData<Boolean> = _loading
@@ -340,7 +339,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val profileImageUrl = resolvedUser?.profileImageUrl.orEmpty()
             .ifBlank { authFallbackUser()?.profileImageUrl.orEmpty() }
         if (profileImageUrl.isNotBlank()) {
-            runCatching { _imageUri.postValue(Uri.parse(profileImageUrl)) }
+            _imageUri.postValue(profileImageUrl.toUri())
         } else {
             _imageUri.postValue(null)
         }
@@ -359,10 +358,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _isValidator.postValue(false)
             _radiusKm.postValue(15)
         }
-        _userDegree.postValue("")
         _eventsCreated.postValue(0)
         _totalValidations.postValue(0)
-        _influenceScore.postValue("0.0")
         _calculatedPoints.postValue(0)
         _pointsSummaryText.postValue("0 total points")
         _completionPercentText.postValue("0% complete")
@@ -370,19 +367,18 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         _levelLabel.postValue("LEVEL 1")
         _progressText.postValue("0 pts to Level 2")
         _achievements.postValue(emptyList())
+        _achievementHistory.postValue(emptyList())
     }
 
     private fun computeStatsAndPost(events: List<Event>, user: User?) {
         val realEventCount = events.size
-        val realValidations = events.sumOf { it.activeVotes + it.inactiveVotes }
+        val realValidations = user?.validationsMadeCount ?: 0
         val points = maxOf(user?.points ?: 0, (realEventCount * 10) + (realValidations * 2))
-        val influence = if (realEventCount > 0) realValidations.toDouble() / realEventCount.toDouble() else 0.0
 
         _eventsCreated.postValue(realEventCount)
         _totalValidations.postValue(realValidations)
         _calculatedPoints.postValue(points)
         _pointsSummaryText.postValue("$points total points")
-        _influenceScore.postValue(String.format(Locale.getDefault(), "%.1f", influence))
 
         val completionScore = listOf(
             user?.displayName?.isNotBlank() == true,
@@ -408,13 +404,161 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         _progressPercent.postValue((pointsIntoLevel.toFloat() / levelRange.toFloat()).coerceIn(0f, 1f))
         _progressText.postValue("$pointsToNext pts to Level ${level + 1}")
 
-        val achievements = buildList {
-            if (realEventCount > 0) add("Event Creator")
-            if (realValidations > 0) add("Community Validator")
-            if (points >= 100) add("Rising Local")
+        val safeUser = (user ?: authFallbackUser()) ?: User()
+        val calculatedAchievements = calculateAchievements(
+            safeUser.copy(
+                points = points,
+                eventsPublishedCount = realEventCount,
+                validationsMadeCount = realValidations
+            ),
+            events
+        )
+
+        val history = mergeAchievementHistory(
+            existingHistory = safeUser.achievementHistory,
+            currentAchievements = calculatedAchievements
+        )
+        _achievementHistory.postValue(history)
+        _achievements.postValue(history.take(3))
+
+        if (safeUser.id.isNotBlank() && safeUser.achievementHistory != history) {
+            val updatedUser = safeUser.copy(
+                points = points,
+                eventsPublishedCount = realEventCount,
+                validationsMadeCount = realValidations,
+                lastUpdated = System.currentTimeMillis()
+            ).also { it.achievementHistory = history }
+            currentUser = updatedUser
+            viewModelScope.launch(Dispatchers.IO) {
+                runCatching { userRepo.updateUserProfile(updatedUser, pushToRemote = true) }
+            }
         }
-        _achievements.postValue(achievements)
     }
+
+    fun calculateAchievements(user: User, userEvents: List<Event>): List<Achievement> {
+        val postCount = maxOf(user.eventsPublishedCount, userEvents.size)
+        val validations = user.validationsMadeCount
+        val totalActiveVotes = userEvents.sumOf { it.activeVotes }
+        val totalInactiveVotes = userEvents.sumOf { it.inactiveVotes }
+        val averageRating = userEvents
+            .filter { it.ratingCount > 0 }
+            .map { it.averageRating }
+            .average()
+            .takeIf { !it.isNaN() }
+            ?: 0.0
+        val leaderboardPoints = maxOf(user.points, (postCount * 10) + (validations * 2))
+
+        val achievements = mutableListOf<Achievement>()
+
+        achievements += when {
+            postCount >= 10 -> achievement(
+                app.getString(R.string.achievement_community_legend),
+                "👑",
+                app.getString(R.string.achievement_community_legend_description)
+            )
+            postCount >= 5 -> achievement(
+                app.getString(R.string.achievement_rising_star),
+                "⭐",
+                app.getString(R.string.achievement_rising_star_description)
+            )
+            else -> achievement(
+                app.getString(R.string.achievement_fresh_face),
+                "🐣",
+                app.getString(R.string.achievement_fresh_face_description)
+            )
+        }
+
+        if (validations >= 100) {
+            achievements += achievement(
+                app.getString(R.string.achievement_oracle),
+                "🔮",
+                app.getString(R.string.achievement_oracle_description)
+            )
+        } else if (validations >= 20) {
+            achievements += achievement(
+                app.getString(R.string.achievement_trustworthy),
+                "🛡️",
+                app.getString(R.string.achievement_trustworthy_description)
+            )
+        } else if (validations >= 1) {
+            achievements += achievement(
+                app.getString(R.string.achievement_fact_checker),
+                "✅",
+                app.getString(R.string.achievement_fact_checker_description)
+            )
+        }
+
+        if (userEvents.size >= 3 && averageRating > 4.5) {
+            achievements += achievement(
+                app.getString(R.string.achievement_gold_standard),
+                "🥇",
+                app.getString(R.string.achievement_gold_standard_description)
+            )
+        }
+
+        if (totalActiveVotes >= 25) {
+            achievements += achievement(
+                app.getString(R.string.achievement_crowd_pleaser),
+                "🔥",
+                app.getString(R.string.achievement_crowd_pleaser_description)
+            )
+        }
+
+        if (totalActiveVotes > totalInactiveVotes && totalActiveVotes > 0) {
+            achievements += achievement(
+                app.getString(R.string.achievement_verified_source),
+                "📡",
+                app.getString(R.string.achievement_verified_source_description)
+            )
+        }
+
+        if (leaderboardPoints >= 500) {
+            achievements += achievement(
+                app.getString(R.string.achievement_socialite),
+                "🎉",
+                app.getString(R.string.achievement_socialite_description)
+            )
+        }
+
+        if (isTopContributor(user.id, leaderboardPoints)) {
+            achievements += achievement(
+                app.getString(R.string.achievement_top_contributor),
+                "🏆",
+                app.getString(R.string.achievement_top_contributor_description)
+            )
+        }
+
+        return achievements.distinctBy { it.name }
+    }
+
+    private fun mergeAchievementHistory(
+        existingHistory: List<Achievement>,
+        currentAchievements: List<Achievement>
+    ): List<Achievement> {
+        val now = System.currentTimeMillis()
+        val existingByName = existingHistory.associateBy { it.name }
+        val currentEntries = currentAchievements.map { achievement ->
+            existingByName[achievement.name] ?: achievement.copy(
+                unlockedAt = achievement.unlockedAt.takeIf { it > 0L } ?: now
+            )
+        }
+        return (existingHistory + currentEntries)
+            .associateBy { it.name }
+            .values
+            .sortedByDescending { it.unlockedAt }
+    }
+
+    private fun isTopContributor(userId: String, currentPoints: Int): Boolean {
+        if (userId.isBlank()) return false
+        val allKnownUsers = listOfNotNull(currentUser)
+        val maxPoints = allKnownUsers.maxOfOrNull { existingUser ->
+            if (existingUser.id == userId) maxOf(existingUser.points, currentPoints) else existingUser.points
+        } ?: currentPoints
+        return currentPoints >= maxPoints
+    }
+
+    private fun achievement(name: String, icon: String, description: String): Achievement =
+        Achievement(name = name, icon = icon, description = description)
 
     private fun buildProfileImageRemotePath(userId: String): String {
         return "profile_images/$userId/${System.currentTimeMillis()}.jpg"
