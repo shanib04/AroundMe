@@ -1,4 +1,4 @@
-package com.colman.aroundme.ui.auth
+package com.colman.aroundme.features.auth.register
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -3,11 +3,12 @@ package com.colman.aroundme.data.repository
 import android.content.Context
 import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.local.dao.UserDao
-import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 // Repository pattern for User data
@@ -20,18 +21,13 @@ class UserRepository private constructor(
 
     fun getUserById(id: String): Flow<User?> = userDao.getUserById(id)
 
-    // Observe a single user by id (flow from Room)
-    fun observeUser(id: String): Flow<User?> = userDao.getUserById(id)
-
     suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
 
     // Fetch a single user from Firebase and upsert locally (best-effort, non-blocking)
     fun refreshUserFromRemote(id: String) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val list = firebase.fetchUsersSince(0L)
-                val found = list.firstOrNull { it.id == id }
-                found?.let { userDao.insert(it) }
+                firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
             } catch (_: Exception) {
                 // ignore
             }
@@ -39,9 +35,10 @@ class UserRepository private constructor(
     }
 
     suspend fun upsertUser(user: User, pushToRemote: Boolean = true) {
-        userDao.insert(user)
+        val normalized = user.normalizedForDisplay()
+        userDao.insert(normalized)
         if (pushToRemote) {
-            firebase.pushUser(user)
+            firebase.pushUser(normalized)
         }
     }
 
@@ -49,7 +46,7 @@ class UserRepository private constructor(
     suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
         return try {
             firebase.isUsernameTaken(username, excludingUserId)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // On any error, be conservative and report it may be taken to avoid duplicates
             true
         }
@@ -63,19 +60,41 @@ class UserRepository private constructor(
         userDao.deleteAll()
     }
 
-    fun syncFromRemote(since: Long = 0L) {
-        // Fire-and-forget background sync; simple implementation
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val remote = firebase.fetchUsersSince(since)
-                for (r in remote) {
-                    // write remote to local — Room handles update/replace
-                    userDao.insert(r)
-                }
-            } catch (e: Exception) {
-                // Log/ignore for now
+    suspend fun syncFromRemoteNow(since: Long = 0L) {
+        try {
+            val remote = firebase.fetchUsersSince(since)
+            for (user in remote) {
+                userDao.insert(user.normalizedForDisplay())
             }
+        } catch (_: Exception) {
+            // ignore best-effort sync failures
         }
+    }
+
+    fun syncFromRemote(since: Long = 0L) {
+        CoroutineScope(Dispatchers.IO).launch {
+            syncFromRemoteNow(since)
+        }
+    }
+
+    private fun User.normalizedForDisplay(): User {
+        val safeDisplayName = displayName.takeIf { it.isNotBlank() }
+            ?: username.takeIf { it.isNotBlank() }
+            ?: name.takeIf { it.isNotBlank() }
+            ?: com.colman.aroundme.features.feed.EventTextFormatter.unknownPublisherText()
+        return copy(displayName = safeDisplayName)
+    }
+
+    suspend fun ensureUsersLoaded(ids: Collection<String>) {
+        ids.map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .forEach { id ->
+                val existing = userDao.getUserById(id).first()
+                if (existing == null || existing.displayName.isBlank()) {
+                    firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
+                }
+            }
     }
 
     companion object {

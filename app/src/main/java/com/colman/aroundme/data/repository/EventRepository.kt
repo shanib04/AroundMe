@@ -4,8 +4,11 @@ import android.content.Context
 import android.util.Log
 import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.local.dao.EventDao
-import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.local.dao.EventInteractionDao
 import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.model.EventInteraction
+import com.colman.aroundme.data.model.EventVoteType
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -15,7 +18,9 @@ import kotlinx.coroutines.launch
 // Repository pattern for Event data
 class EventRepository private constructor(
     private val eventDao: EventDao,
-    private val firebase: FirebaseModel
+    private val eventInteractionDao: EventInteractionDao,
+    private val firebase: FirebaseModel,
+    private val identityRepository: IdentityRepository
 ) {
 
     init {
@@ -79,6 +84,7 @@ class EventRepository private constructor(
                 val demoEvents = listOf(
                     Event(
                         id = "music_jazz_park",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Live Jazz in the Park",
                         description = "A sunset jazz set with local musicians, picnic blankets, and a relaxed crowd right in the city center.",
                         imageUrl = "https://images.unsplash.com/photo-1511192336575-5a79af67a629?auto=format&fit=crop&w=1200&q=80",
@@ -91,6 +97,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "food_market_downtown",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Downtown Food Market",
                         description = "Street food stalls, coffee carts, and dessert pop-ups with live tastings from local vendors.",
                         imageUrl = "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80",
@@ -103,6 +110,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "art_gallery_night",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Open Art Garden",
                         description = "A community art showcase with installations, live sketching, and interactive workshops.",
                         imageUrl = "https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1200&q=80",
@@ -115,6 +123,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "beer_rooftop_evening",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Craft Beer Evening",
                         description = "Small brewery taps, snacks, and an easygoing social vibe with acoustic background music.",
                         imageUrl = "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=1200&q=80",
@@ -127,6 +136,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "sport_morning_run",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Community Run Meetup",
                         description = "A casual group run with warm-up stretches and a cool-down coffee stop after the route.",
                         imageUrl = "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=1200&q=80",
@@ -139,6 +149,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "multi_cat_sport_art",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Yoga & Painting Retreat",
                         description = "Start with a guided outdoor yoga session, followed by an intuitive canvas painting workshop.",
                         imageUrl = "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
@@ -151,6 +162,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "unknown_gaming_night",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Retro Gaming Tournament",
                         description = "Smash Bros, Mario Kart, and retro arcade cabinets. Bring your own controller!",
                         imageUrl = "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=1200&q=80",
@@ -163,6 +175,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "unknown_then_music",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Silent Disco Reading",
                         description = "Grab a headset, read a book, and when the bell rings, the DJ drops a set.",
                         imageUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&w=1200&q=80",
@@ -175,6 +188,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "jerusalem_market_live",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Machane Yehuda Live Market",
                         description = "Live music, food tastings, and evening crowds filling the market with energy.",
                         imageUrl = "https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&w=1200&q=80",
@@ -187,6 +201,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "jerusalem_old_city_music",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Old City Night Melodies",
                         description = "An intimate live music set with acoustic performances near the Old City walls.",
                         imageUrl = "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1200&q=80",
@@ -199,6 +214,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "jerusalem_art_station",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "First Station Art Walk",
                         description = "Pop-up artists, local prints, and creative workshops across the station plaza.",
                         imageUrl = "https://images.unsplash.com/photo-1518998053901-5348d3961a04?auto=format&fit=crop&w=1200&q=80",
@@ -211,6 +227,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "jerusalem_beer_festival",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Jerusalem Beer Garden",
                         description = "Craft pours, food trucks, and local DJs at an outdoor beer garden event.",
                         imageUrl = "https://images.unsplash.com/photo-1470337458703-46ad1756a187?auto=format&fit=crop&w=1200&q=80",
@@ -223,6 +240,7 @@ class EventRepository private constructor(
                     ),
                     Event(
                         id = "jerusalem_city_run",
+                        publisherId = DEMO_PUBLISHER_ID,
                         title = "Jerusalem Sunrise Run",
                         description = "A scenic community run through the city with hydration points and group warm-up.",
                         imageUrl = "https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=1200&q=80",
@@ -242,14 +260,82 @@ class EventRepository private constructor(
         }
     }
 
+    fun observeInteraction(eventId: String) =
+        eventInteractionDao.observeInteraction(eventId, identityRepository.getActorId())
+
+    suspend fun getInteraction(eventId: String): EventInteraction? {
+        return eventInteractionDao.getInteraction(eventId, identityRepository.getActorId())
+    }
+
+    suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = voteType,
+            rating = existingInteraction?.rating ?: 0,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+        return recalculateEventAggregates(currentEvent)
+    }
+
+    suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {
+        val normalizedRating = rating.coerceIn(1, 5)
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = existingInteraction?.voteType,
+            rating = normalizedRating,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+        recalculateEventAggregates(currentEvent)
+        return updatedInteraction
+    }
+
+    private suspend fun recalculateEventAggregates(event: Event): Event {
+        val interactions = eventInteractionDao.getInteractionsForEvent(event.id)
+        val activeVotes = interactions.count { it.voteType == EventVoteType.ACTIVE }
+        val inactiveVotes = interactions.count { it.voteType == EventVoteType.INACTIVE }
+        val ratings = interactions.map { it.rating }.filter { it > 0 }
+        val updatedEvent = event.copy(
+            activeVotes = activeVotes,
+            inactiveVotes = inactiveVotes,
+            averageRating = if (ratings.isEmpty()) 0.0 else ratings.average(),
+            ratingCount = ratings.size,
+            lastUpdated = System.currentTimeMillis()
+        )
+
+        eventDao.insert(updatedEvent)
+        try {
+            firebase.pushEvent(updatedEvent)
+        } catch (e: Exception) {
+            Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
+        }
+        return updatedEvent
+    }
+
     companion object {
+        private const val TAG = "EventRepository"
+        private const val DEMO_PUBLISHER_ID = "demo_publisher"
+
         @Volatile
         private var INSTANCE: EventRepository? = null
-        private const val TAG = "EventRepository"
 
         fun getInstance(context: Context): EventRepository = INSTANCE ?: synchronized(this) {
             val db = AppLocalDb.getInstance(context)
-            val repo = EventRepository(db.eventDao(), FirebaseModel.getInstance())
+            val repo = EventRepository(
+                eventDao = db.eventDao(),
+                eventInteractionDao = db.eventInteractionDao(),
+                firebase = FirebaseModel.getInstance(),
+                identityRepository = IdentityRepository(context)
+            )
             INSTANCE = repo
             repo
         }

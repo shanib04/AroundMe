@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.fragment.ktx)
@@ -76,7 +77,8 @@ dependencies {
     implementation(libs.firebase.storage)
     implementation(libs.play.services.auth)
     implementation(libs.glide)
-    
+    implementation("com.squareup.picasso:picasso:2.8")
+
     implementation("com.firebase:geofire-android-common:3.2.0")
 
     // Room

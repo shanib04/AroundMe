@@ -21,6 +21,8 @@ data class Event(
     val timeRemaining: String = "",
     val activeVotes: Int = 0,
     val inactiveVotes: Int = 0,
+    val averageRating: Double = 0.0,
+    val ratingCount: Int = 0,
     val lastUpdated: Long = System.currentTimeMillis()
 ) {
     val isEnded: Boolean
