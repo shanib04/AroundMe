@@ -63,9 +63,9 @@ class FeedViewModel(
     init {
         uiStateSource.value = FeedUiState(emptyMessage = "Pull to refresh to load nearby events.")
         uiStateSource.addSource(allEvents) { events ->
-            sourceEvents = events
+            sourceEvents = events.filterNot { it.isEnded }
             viewModelScope.launch {
-                syncInteractionCache(events)
+                syncInteractionCache(sourceEvents)
             }
         }
         uiStateSource.addSource(allUsers) { users ->
@@ -165,7 +165,6 @@ class FeedViewModel(
 
     private fun endingRank(event: Event): Int {
         return when {
-            event.isEnded -> 2
             event.expirationTime > 0L -> 0
             else -> 1
         }

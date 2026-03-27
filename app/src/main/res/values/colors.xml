@@ -64,6 +64,11 @@
     <color name="profile_accent">#3ECF8E</color>
     <color name="profile_card_lilac">#EADCF8</color>
     <color name="profile_card_mint">#DDE8FF</color>
+    <color name="profile_avatar_inner">#FFFFE7DA</color>
+    <color name="profile_avatar_ring">#FFFFB5A0</color>
+    <color name="profile_points_card_top">#FFFFF0E7</color>
+    <color name="profile_points_card_bottom">#FFFFF7F2</color>
+    <color name="profile_points_card_stroke">#FFEEDFD5</color>
 
     <!-- Feed Chips -->
     <color name="feed_chip_blue_bg">#E9FBFF</color>

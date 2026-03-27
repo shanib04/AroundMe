@@ -192,10 +192,6 @@ class ProfileFragment : Fragment() {
             }
         }
 
-        viewModel.isValidator.observe(viewLifecycleOwner) { isValidator ->
-            profileBinding.validatorBadge.isVisible = isValidator
-        }
-
         viewModel.isReliableContributor.observe(viewLifecycleOwner) { isReliable ->
             profileBinding.reliableBadge.isVisible = isReliable
         }
