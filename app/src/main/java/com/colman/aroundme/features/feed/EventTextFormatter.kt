@@ -36,9 +36,9 @@ object EventTextFormatter {
 
     fun compactRatingText(event: Event): String {
         return if (event.ratingCount <= 0) {
-            "New"
+            NO_RATINGS_YET
         } else {
-            String.format(Locale.US, "%.1f★", event.averageRating)
+            String.format(Locale.US, "%.1f", event.averageRating)
         }
     }
 
