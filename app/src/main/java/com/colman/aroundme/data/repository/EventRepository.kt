@@ -32,10 +32,7 @@ class EventRepository private constructor(
         // Demo seeding removed.
     }
 
-    /**
-     * Primary events feed: sourced from Firebase (Firestore).
-     * Room is used only as a local cache for other screens/queries.
-     */
+    // Primary events feed: sourced from Firebase (Firestore). Room is a best-effort cache.
     fun observeAll(): Flow<List<Event>> = callbackFlow {
         val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
             .addSnapshotListener { snaps, err ->
@@ -74,10 +71,8 @@ class EventRepository private constructor(
     // Observe events for a specific publisher (LiveData from Room)
     fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
 
-    /**
-     * Real-time event details from Firestore.
-     * Uses snapshot listener and emits updates immediately as Flow.
-     */
+    // Real-time event details from Firestore.
+    // Uses snapshot listener and emits updates immediately as Flow.
     fun getEventDetails(eventId: String): Flow<Event?> = callbackFlow {
         val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
             .document(eventId)
@@ -98,11 +93,9 @@ class EventRepository private constructor(
         awaitClose { reg.remove() }
     }
 
-    /**
-     * Real-time event list synchronization.
-     * Whenever events change in Firestore, we upsert to Room.
-     * Screens observing Room will update immediately.
-     */
+    // Real-time event list synchronization from Firestore into Room.
+    // Whenever events change in Firestore, we upsert to Room.
+    // Screens observing Room will update immediately.
     fun startEventsRealtimeSync() {
         if (eventsListListener != null) return
 
@@ -301,7 +294,4 @@ class EventRepository private constructor(
     }
 }
 
-/*
-NOTE: Removed duplicate Firestore-transaction-based submitVote/submitRating implementations below.
-They conflicted with the Room-based methods above and caused compilation failures.
-*/
+// Note: removed duplicate Firestore-transaction-based submitVote/submitRating implementations that conflicted.

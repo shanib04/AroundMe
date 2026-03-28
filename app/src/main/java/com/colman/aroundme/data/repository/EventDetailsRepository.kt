@@ -9,10 +9,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
-/**
- * Repository dedicated to the Event Details screen.
- * It uses Firestore as the source of truth for event + votes + ratings.
- */
+// Repository dedicated to the Event Details screen (Firestore is the source of truth).
 class EventDetailsRepository(
     private val firestore: FirebaseFirestore,
     private val firebaseModel: FirebaseModel
@@ -34,9 +31,7 @@ class EventDetailsRepository(
         return firebaseModel.fetchUserById(publisherId)
     }
 
-    /**
-     * Atomically increments vote counters in Firestore.
-     */
+    // Atomically increments vote counters in Firestore.
     suspend fun submitVote(eventId: String, voteType: EventVoteType) {
         val field = when (voteType) {
             EventVoteType.ACTIVE -> "activeVotes"
@@ -66,9 +61,7 @@ class EventDetailsRepository(
         }
     }
 
-    /**
-     * Reads current user's rating for this event (1..5) if exists.
-     */
+    // Reads current user's rating for this event (1..5) if exists.
     suspend fun fetchMyRating(eventId: String): Int? {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return null
         return try {
@@ -85,10 +78,7 @@ class EventDetailsRepository(
         }
     }
 
-    /**
-     * Submits/updates user's rating (1..5) in subcollection and updates aggregate fields
-     * (averageRating, ratingCount) in the parent event document via transaction.
-     */
+    // Submits/updates user's rating (1..5) and updates aggregates.
     suspend fun submitRating(eventId: String, rating: Int) {
         require(rating in 1..5)
         val uid = FirebaseAuth.getInstance().currentUser?.uid

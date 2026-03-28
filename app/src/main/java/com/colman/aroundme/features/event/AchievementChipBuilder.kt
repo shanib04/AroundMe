@@ -6,10 +6,7 @@ import com.colman.aroundme.R
 import com.google.android.material.chip.Chip
 import com.google.android.material.shape.CornerFamily
 
-/**
- * Creates achievement chips shown on the publisher card.
- * Visuals follow the design: subtle tinted background + bold label.
- */
+// Creates achievement chips shown on the publisher card.
 object AchievementChipBuilder {
 
     fun create(context: Context, title: String): Chip {
@@ -30,4 +27,3 @@ object AchievementChipBuilder {
         }
     }
 }
-
