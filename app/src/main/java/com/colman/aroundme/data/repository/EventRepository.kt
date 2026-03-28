@@ -28,9 +28,7 @@ class EventRepository private constructor(
     private val userRepository: UserRepository
 ) {
 
-    init {
-        // Demo seeding removed.
-    }
+    init {}
 
     // Primary events feed: sourced from Firebase (Firestore). Room is a best-effort cache.
     fun observeAll(): Flow<List<Event>> = callbackFlow {
@@ -72,7 +70,6 @@ class EventRepository private constructor(
     fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
 
     // Real-time event details from Firestore.
-    // Uses snapshot listener and emits updates immediately as Flow.
     fun getEventDetails(eventId: String): Flow<Event?> = callbackFlow {
         val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
             .document(eventId)
@@ -94,8 +91,6 @@ class EventRepository private constructor(
     }
 
     // Real-time event list synchronization from Firestore into Room.
-    // Whenever events change in Firestore, we upsert to Room.
-    // Screens observing Room will update immediately.
     fun startEventsRealtimeSync() {
         if (eventsListListener != null) return
 
@@ -144,8 +139,7 @@ class EventRepository private constructor(
         }
     }
 
-    // --- Voting / Rating (single implementation) ---
-
+    // Voting / Rating
     suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
         val actorId = identityRepository.getActorId()
         val currentEvent = eventDao.getByIdNow(eventId) ?: return null
@@ -294,5 +288,3 @@ class EventRepository private constructor(
         }
     }
 }
-
-// Note: removed duplicate Firestore-transaction-based submitVote/submitRating implementations that conflicted.
