@@ -15,6 +15,7 @@ import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -88,7 +89,7 @@ class EventDetailsViewModel(
                 _event.value = e
                 e?.let { ev ->
                     // Load publisher (Room first, fallback remote)
-                    val roomUser = userRepository.getByIdNow(ev.publisherId)
+                    val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
                     _publisher.value = roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
 
                     if (ev.latitude != 0.0 && ev.longitude != 0.0) {
