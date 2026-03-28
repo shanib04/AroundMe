@@ -11,9 +11,10 @@ import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 
-data class MyEventItem(
-    val item: EventCardItem
-)
+sealed interface MyEventRow {
+    data class SectionHeader(val title: String) : MyEventRow
+    data class EventRow(val item: EventCardItem) : MyEventRow
+}
 
 class MyEventsViewModel(
     repository: EventRepository,
@@ -24,8 +25,8 @@ class MyEventsViewModel(
     private val currentUserId = auth.currentUser?.uid.orEmpty()
     private val source = repository.observeEventsByPublisher(currentUserId)
     private val allUsers = userRepository.observeAll().asLiveData()
-    private val _events = MediatorLiveData<List<MyEventItem>>()
-    val events: LiveData<List<MyEventItem>> = _events
+    private val _events = MediatorLiveData<List<MyEventRow>>()
+    val events: LiveData<List<MyEventRow>> = _events
 
     private var currentEvents: List<Event> = emptyList()
     private var usersById: Map<String, User> = emptyMap()
@@ -45,17 +46,31 @@ class MyEventsViewModel(
     }
 
     private fun publishItems() {
-        _events.value = currentEvents.map { event ->
-            val user = usersById[event.publisherId]
-            MyEventItem(
-                item = EventCardItemMapper.fromEvent(
-                    event = event,
-                    user = user,
-                    statusText = if (event.isEnded) "Ended" else "Live",
-                    postedText = if (event.isEnded) "RECREATE EVENT" else "EDIT EVENT"
-                )
-            )
+        val activeEvents = currentEvents.filterNot { it.isEnded }
+        val endedEvents = currentEvents.filter { it.isEnded }
+        val rows = mutableListOf<MyEventRow>()
+
+        if (activeEvents.isNotEmpty()) {
+            rows += MyEventRow.SectionHeader("Active Events")
+            rows += activeEvents.map { event -> eventRowFor(event, "Live", "EDIT EVENT") }
         }
+        if (endedEvents.isNotEmpty()) {
+            rows += MyEventRow.SectionHeader("Expired Events")
+            rows += endedEvents.map { event -> eventRowFor(event, "Ended", "RECREATE EVENT") }
+        }
+        _events.value = rows
+    }
+
+    private fun eventRowFor(event: Event, statusText: String, postedText: String): MyEventRow.EventRow {
+        val user = usersById[event.publisherId]
+        return MyEventRow.EventRow(
+            item = EventCardItemMapper.fromEvent(
+                event = event,
+                user = user,
+                statusText = statusText,
+                postedText = postedText
+            )
+        )
     }
 
     class Factory(

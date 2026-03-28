@@ -135,7 +135,7 @@
                     android:id="@+id/radiusValueText"
                     android:layout_width="65dp"
                     android:layout_height="wrap_content"
-                    android:text="25 km"
+                    android:text="15 km"
                     android:textColor="@color/map_text_muted"
                     android:textSize="16sp"
                     android:textStyle="bold" />
@@ -147,7 +147,7 @@
                     android:layout_marginStart="4dp"
                     android:layout_weight="1"
                     android:stepSize="0.5"
-                    android:value="25.0"
+                    android:value="15.0"
                     android:valueFrom="0.5"
                     android:valueTo="80.0"
                     app:haloColor="@color/map_primary_soft"

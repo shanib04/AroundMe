@@ -8,6 +8,7 @@ data class EventCardItem(
     val event: Event,
     val hostName: String,
     val hostSubtitle: String,
+    val hostAvatarUrl: String,
     val locationText: String,
     val statusText: String,
     val activeVotesText: String,
@@ -30,6 +31,7 @@ object EventCardItemMapper {
             hostName = user?.displayName?.takeIf { it.isNotBlank() } ?: EventTextFormatter.unknownPublisherText(),
             hostSubtitle = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" }
                 ?: event.category.ifBlank { EventTextFormatter.eventHostFallbackText() },
+            hostAvatarUrl = user?.profileImageUrl.orEmpty(),
             locationText = event.locationName.ifBlank { EventTextFormatter.unknownLocationText() },
             statusText = statusText,
             activeVotesText = formatCompactCount(event.activeVotes),

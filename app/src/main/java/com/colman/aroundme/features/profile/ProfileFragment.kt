@@ -9,27 +9,25 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.ViewModelProvider
-import com.bumptech.glide.Glide
-import com.colman.aroundme.R
-import com.colman.aroundme.databinding.FragmentProfileBinding
-import com.colman.aroundme.features.profile.ProfileViewModel
-import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.colman.aroundme.R
+import com.colman.aroundme.data.model.Achievement
+import com.colman.aroundme.databinding.FragmentProfileBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import java.text.NumberFormat
-import android.widget.TextView
 
 class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentProfileBinding accessed outside of onCreateView/onDestroyView" }
 
-    // Create AndroidViewModel using the AndroidViewModelFactory to ensure Application is provided
     private val viewModel: ProfileViewModel by viewModels {
         ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
     }
-
-    private var currentUserId: String = ""
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,24 +50,19 @@ class ProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // Attempt to get current Firebase user id
-        val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
-        currentUserId = fbUser?.uid ?: "local_user"
-
-        // Observe and load inside try/catch to avoid runtime crashes
         try {
             observeViewModel()
-            viewModel.loadCurrentUser(currentUserId)
+            viewModel.loadCurrentUser()
 
-            // Only access binding if inflation succeeded
             if (_binding != null) {
-                // Toolbar navigation and menu
-                binding.toolbarProfile.setNavigationOnClickListener { findNavController().popBackStack() }
+                binding.toolbarProfile.setNavigationOnClickListener {
+                    findNavController().navigate(R.id.feedFragment)
+                }
+                binding.toolbarProfile.menu.clear()
                 binding.toolbarProfile.inflateMenu(R.menu.menu_profile)
                 binding.toolbarProfile.setOnMenuItemClickListener { item ->
                     when (item.itemId) {
-                        R.id.action_settings -> {
-                            // Open edit profile screen directly
+                        R.id.action_edit_profile -> {
                             findNavController().navigate(R.id.action_profileFragment_to_editProfileFragment)
                             true
                         }
@@ -80,10 +73,20 @@ class ProfileFragment : Fragment() {
                                 .setNegativeButton("Cancel", null)
                                 .setPositiveButton("Logout") { _, _ ->
                                     viewModel.logout { ok ->
-                                        if (ok) {
-                                            val nav = findNavController()
-                                            nav.popBackStack(nav.graph.startDestinationId, false)
-                                            nav.navigate(R.id.loginFragment)
+                                        if (!isAdded) return@logout
+                                        requireActivity().runOnUiThread {
+                                            if (!isAdded) return@runOnUiThread
+                                            if (ok) {
+                                                findNavController().navigate(
+                                                    R.id.loginFragment,
+                                                    null,
+                                                    NavOptions.Builder()
+                                                        .setPopUpTo(R.id.nav_graph, true)
+                                                        .build()
+                                                )
+                                            } else {
+                                                Snackbar.make(binding.root, "Logout failed", Snackbar.LENGTH_LONG).show()
+                                            }
                                         }
                                     }
                                 }
@@ -93,84 +96,82 @@ class ProfileFragment : Fragment() {
                         else -> false
                     }
                 }
+                binding.viewAllAchievementsText.setOnClickListener {
+                    findNavController().navigate(R.id.action_profileFragment_to_achievementsHistoryFragment)
+                }
                 // radius slider interaction
-                binding.radiusSlider.addOnChangeListener { _, value, _ ->
+                binding.radiusSlider.addOnChangeListener { _, value, fromUser ->
                     val km = value.toInt()
                     binding.radiusValueText.text = getString(R.string.map_radius_km_format, km)
-                    viewModel.setRadiusKm(km)
+                    if (fromUser) {
+                        viewModel.setRadiusKm(km)
+                    }
                 }
             }
         } catch (ex: Exception) {
             Log.e("ProfileFragment", "Error initializing profile UI", ex)
-            // If view is available, show snackbar; otherwise log
-            if (view != null) Snackbar.make(view, "Profile failed to load", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(view, "Profile failed to load", Snackbar.LENGTH_LONG).show()
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        viewModel.loadCurrentUser()
+    }
+
     private fun observeViewModel() {
-        val b = _binding ?: return
+        val profileBinding = _binding ?: return
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
-            if (uri != null) Glide.with(this).load(uri).circleCrop().into(b.profileImageView)
-            else b.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+            if (uri != null) {
+                Glide.with(this)
+                    .load(uri)
+                    .placeholder(R.drawable.ic_person_placeholder)
+                    .error(R.drawable.ic_person_placeholder)
+                    .diskCacheStrategy(DiskCacheStrategy.NONE)
+                    .skipMemoryCache(true)
+                    .circleCrop()
+                    .into(profileBinding.profileImageView)
+            } else {
+                profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+            }
         }
 
-        viewModel.name.observe(viewLifecycleOwner) { name ->
-            b.profileNameText.text = name.ifBlank { getString(R.string.profile_not_available) }
+        viewModel.displayName.observe(viewLifecycleOwner) { displayName ->
+            profileBinding.profileNameText.text = displayName.ifBlank { getString(R.string.profile_not_available) }
         }
 
-        viewModel.handle.observe(viewLifecycleOwner) { handle ->
-            b.profileHandleText.text = handle
-        }
-
-        viewModel.userDegree.observe(viewLifecycleOwner) { degree ->
-            b.userDegreeText.text = degree
-            b.userDegreeText.isVisible = degree.isNotBlank()
+        viewModel.username.observe(viewLifecycleOwner) { username ->
+            profileBinding.profileHandleText.text = username.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
+            profileBinding.profileHandleText.isVisible = username.isNotBlank()
         }
 
         viewModel.eventsCreated.observe(viewLifecycleOwner) { count ->
-            b.eventsCountText.text = count.toString()
+            profileBinding.eventsCountText.text = count.toString()
             val hasPosts = count > 0
-            // show placeholder message when no posts, but always display the points card (green box)
-            b.noPostsPlaceholder.isVisible = !hasPosts
-            b.pointsCard.isVisible = true
+            profileBinding.noPostsPlaceholder.isVisible = !hasPosts
+            profileBinding.pointsCard.isVisible = true
         }
 
         viewModel.totalValidations.observe(viewLifecycleOwner) { total ->
-            b.validationsCountText.text = total.toString()
-        }
-
-        viewModel.influenceScore.observe(viewLifecycleOwner) { inf ->
-            b.influenceText.text = inf
+            profileBinding.validationsCountText.text = total.toString()
         }
 
         viewModel.calculatedPoints.observe(viewLifecycleOwner) { pts ->
-            b.pointsValueText.text = NumberFormat.getIntegerInstance().format(pts)
+            val formatted = NumberFormat.getIntegerInstance().format(pts)
+            profileBinding.pointsValueText.text = formatted
         }
 
         viewModel.levelLabel.observe(viewLifecycleOwner) { level ->
-            b.levelPill.text = level
+            profileBinding.levelPill.text = level
         }
 
         viewModel.progressText.observe(viewLifecycleOwner) { txt ->
-            b.progressRightText.text = txt
+            profileBinding.progressRightText.text = txt
         }
 
         viewModel.achievements.observe(viewLifecycleOwner) { list ->
-            // populate achievement captions safely
-            val l = list ?: emptyList()
-            val first = l.getOrNull(0) ?: ""
-            val second = l.getOrNull(1) ?: ""
-            val third = l.getOrNull(2) ?: ""
-            val row = b.achievementsRow
-            if (row.childCount >= 3) {
-                val a1 = row.getChildAt(0)
-                val a2 = row.getChildAt(1)
-                val a3 = row.getChildAt(2)
-                (a1 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = first }
-                (a2 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = second }
-                (a3 as? ViewGroup)?.let { vg -> (vg.getChildAt(1) as? TextView)?.text = third }
-            }
+            bindAchievementPreview(list.orEmpty())
         }
 
         viewModel.radiusKm.observe(viewLifecycleOwner) { km ->
@@ -189,6 +190,62 @@ class ProfileFragment : Fragment() {
                 lp.width = fillWidth
                 fill.layoutParams = lp
             }
+        }
+
+        viewModel.isReliableContributor.observe(viewLifecycleOwner) { isReliable ->
+            profileBinding.reliableBadge.isVisible = isReliable
+        }
+
+        viewModel.pointsSummaryText.observe(viewLifecycleOwner) { pointsText ->
+            profileBinding.pointsSummaryText.text = pointsText
+        }
+
+        viewModel.completionPercentText.observe(viewLifecycleOwner) { completionText ->
+            profileBinding.completionPercentText.text = completionText
+        }
+    }
+
+    private fun bindAchievementPreview(achievements: List<Achievement>) {
+        val binding = _binding ?: return
+        val slots = listOf(
+            Triple(binding.achievementSlotOne, binding.achievementOneIconText, binding.achievementOneNameText),
+            Triple(binding.achievementSlotTwo, binding.achievementTwoIconText, binding.achievementTwoNameText),
+            Triple(binding.achievementSlotThree, binding.achievementThreeIconText, binding.achievementThreeNameText)
+        )
+
+        slots.forEachIndexed { index, (container, iconView, nameView) ->
+            val achievement = achievements.getOrNull(index)
+            if (achievement == null) {
+                container.isVisible = false
+                container.contentDescription = null
+                container.setOnClickListener(null)
+                container.isClickable = false
+                container.isFocusable = false
+            } else {
+                container.isVisible = true
+                iconView.text = achievement.icon
+                nameView.text = achievement.name
+                iconView.setBackgroundResource(backgroundForAchievement(achievement))
+                container.contentDescription = achievement.name
+                container.setOnClickListener(null)
+                container.isClickable = false
+                container.isFocusable = false
+            }
+        }
+    }
+
+    private fun backgroundForAchievement(achievement: Achievement): Int {
+        val name = achievement.name.lowercase()
+        return when {
+            name.contains("rising") ||
+                name.contains("legend") ||
+                name.contains("fresh face") -> R.drawable.ach_bg_orange
+
+            name.contains("trustworthy") ||
+                name.contains("oracle") ||
+                name.contains("fact checker") -> R.drawable.ach_bg_blue
+
+            else -> R.drawable.ach_bg_purple
         }
     }
 

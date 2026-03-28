@@ -9,20 +9,49 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.ViewEventCardBinding
+import com.colman.aroundme.databinding.ViewMyEventsSectionHeaderBinding
+import com.squareup.picasso.MemoryPolicy
+import com.squareup.picasso.NetworkPolicy
 import com.squareup.picasso.Picasso
 
 class MyEventsAdapter(
     private val onEditClick: (String) -> Unit,
     private val onRecreateClick: (String) -> Unit
-) : ListAdapter<MyEventItem, MyEventsAdapter.MyEventViewHolder>(DiffCallback) {
+) : ListAdapter<MyEventRow, RecyclerView.ViewHolder>(DiffCallback) {
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MyEventViewHolder {
-        val binding = ViewEventCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return MyEventViewHolder(binding, onEditClick, onRecreateClick)
+    override fun getItemViewType(position: Int): Int {
+        return when (getItem(position)) {
+            is MyEventRow.SectionHeader -> VIEW_TYPE_HEADER
+            is MyEventRow.EventRow -> VIEW_TYPE_EVENT
+        }
     }
 
-    override fun onBindViewHolder(holder: MyEventViewHolder, position: Int) {
-        holder.bind(getItem(position))
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return when (viewType) {
+            VIEW_TYPE_HEADER -> {
+                val binding = ViewMyEventsSectionHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                SectionHeaderViewHolder(binding)
+            }
+            else -> {
+                val binding = ViewEventCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                MyEventViewHolder(binding, onEditClick, onRecreateClick)
+            }
+        }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val item = getItem(position)) {
+            is MyEventRow.SectionHeader -> (holder as SectionHeaderViewHolder).bind(item)
+            is MyEventRow.EventRow -> (holder as MyEventViewHolder).bind(item)
+        }
+    }
+
+    class SectionHeaderViewHolder(
+        private val binding: ViewMyEventsSectionHeaderBinding
+    ) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(header: MyEventRow.SectionHeader) {
+            binding.sectionTitleText.text = header.title
+        }
     }
 
     class MyEventViewHolder(
@@ -31,11 +60,12 @@ class MyEventsAdapter(
         private val onRecreateClick: (String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(myEvent: MyEventItem) {
-            val item = myEvent.item
+        fun bind(row: MyEventRow.EventRow) {
+            val item = row.item
             val event = item.event
             binding.hostNameText.text = item.hostName
             binding.hostSubtitleText.text = item.hostSubtitle
+            bindHostAvatar(item.hostAvatarUrl)
             binding.locationText.text = item.locationText
             binding.distanceBadgeText.text = item.averageRatingText
             binding.statusBadgeText.text = item.statusText
@@ -46,6 +76,7 @@ class MyEventsAdapter(
             binding.inactiveVotesText.text = item.inactiveVotesText
             binding.averageRatingText.text = item.averageRatingText
             binding.postedTimeText.text = item.postedText
+            binding.postedTimeText.isVisible = false
 
             binding.moreButton.isVisible = false
             binding.activeVotesButton.isVisible = false
@@ -92,6 +123,22 @@ class MyEventsAdapter(
             }
         }
 
+        private fun bindHostAvatar(avatarUrl: String) {
+            if (avatarUrl.isBlank()) {
+                binding.hostAvatarImageView.setImageResource(R.drawable.ic_person_placeholder)
+                return
+            }
+            Picasso.get()
+                .load(avatarUrl)
+                .placeholder(R.drawable.ic_person_placeholder)
+                .error(R.drawable.ic_person_placeholder)
+                .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
+                .networkPolicy(NetworkPolicy.NO_CACHE)
+                .fit()
+                .centerCrop()
+                .into(binding.hostAvatarImageView)
+        }
+
         private fun bindImage(imageUrl: String) {
             if (imageUrl.isBlank()) {
                 binding.eventImageView.setImageResource(R.drawable.bg_register_image_placeholder)
@@ -107,8 +154,20 @@ class MyEventsAdapter(
         }
     }
 
-    private object DiffCallback : DiffUtil.ItemCallback<MyEventItem>() {
-        override fun areItemsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem.item.event.id == newItem.item.event.id
-        override fun areContentsTheSame(oldItem: MyEventItem, newItem: MyEventItem): Boolean = oldItem == newItem
+    private object DiffCallback : DiffUtil.ItemCallback<MyEventRow>() {
+        override fun areItemsTheSame(oldItem: MyEventRow, newItem: MyEventRow): Boolean {
+            return when {
+                oldItem is MyEventRow.SectionHeader && newItem is MyEventRow.SectionHeader -> oldItem.title == newItem.title
+                oldItem is MyEventRow.EventRow && newItem is MyEventRow.EventRow -> oldItem.item.event.id == newItem.item.event.id
+                else -> false
+            }
+        }
+
+        override fun areContentsTheSame(oldItem: MyEventRow, newItem: MyEventRow): Boolean = oldItem == newItem
+    }
+
+    private companion object {
+        const val VIEW_TYPE_HEADER = 0
+        const val VIEW_TYPE_EVENT = 1
     }
 }

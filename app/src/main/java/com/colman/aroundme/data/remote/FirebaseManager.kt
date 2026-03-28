@@ -5,8 +5,8 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.tasks.await
 
 /// Simple Firebase manager to abstract away direct Firebase calls from repositories
@@ -14,9 +14,13 @@ class FirebaseModel private constructor() {
 
     private val firestore = FirebaseFirestore.getInstance()
     private val storage = FirebaseStorage.getInstance()
+    private val imageUploader = ImageUploader(storage)
 
     companion object {
         private var INSTANCE: FirebaseModel? = null
+        private const val USERS_COLLECTION = "Users"
+        private const val EVENTS_COLLECTION = "events"
+        private const val EVENT_RATINGS_COLLECTION = "ratings"
         fun getInstance(): FirebaseModel = INSTANCE ?: synchronized(this) {
             val inst = FirebaseModel()
             INSTANCE = inst
@@ -25,34 +29,97 @@ class FirebaseModel private constructor() {
     }
 
     suspend fun uploadImage(uri: Uri, remotePath: String, progressCallback: (Int) -> Unit): String {
-        val ref = storage.reference.child(remotePath)
-        val deferred = CompletableDeferred<String>()
-        val uploadTask = ref.putFile(uri)
+        return imageUploader.upload(uri, remotePath, progressCallback)
+    }
 
-        uploadTask.addOnProgressListener { snapshot ->
-            val percent = if (snapshot.totalByteCount > 0) ((100.0 * snapshot.bytesTransferred) / snapshot.totalByteCount).toInt() else 0
-            progressCallback(percent)
-        }.addOnSuccessListener {
-            // fetch download url
-            ref.downloadUrl.addOnSuccessListener { url ->
-                deferred.complete(url.toString())
-            }.addOnFailureListener { e -> deferred.completeExceptionally(e) }
-        }.addOnFailureListener { e ->
-            deferred.completeExceptionally(e)
+    suspend fun updateEventRatingAggregate(eventId: String, actorId: String, rating: Int): Event? {
+        val normalizedRating = rating.coerceIn(1, 5)
+        val eventRef = firestore.collection(EVENTS_COLLECTION).document(eventId)
+        val ratingCollection = eventRef.collection(EVENT_RATINGS_COLLECTION)
+        val ratingRef = ratingCollection.document(actorId)
+
+        val ratingsByActor = try {
+            ratingCollection
+                .get()
+                .await()
+                .documents
+                .associate { doc ->
+                    doc.id to (doc.getLong("rating")?.toInt()?.coerceIn(1, 5) ?: 0)
+                }
+                .toMutableMap()
+        } catch (_: FirebaseFirestoreException) {
+            mutableMapOf()
         }
+        ratingsByActor[actorId] = normalizedRating
 
-        return deferred.await()
+        return firestore.runTransaction { transaction ->
+            val eventSnapshot = transaction.get(eventRef)
+            val currentEvent = eventSnapshot.toObject(Event::class.java) ?: return@runTransaction null
+
+            val validRatings = ratingsByActor.values.filter { it in 1..5 }
+            val updatedEvent = currentEvent.copy(
+                averageRating = if (validRatings.isEmpty()) 0.0 else validRatings.average(),
+                ratingCount = validRatings.size,
+                lastUpdated = System.currentTimeMillis()
+            )
+
+            transaction.set(
+                ratingRef,
+                mapOf(
+                    "actorId" to actorId,
+                    "rating" to normalizedRating,
+                    "lastUpdated" to updatedEvent.lastUpdated
+                ),
+                SetOptions.merge()
+            )
+            transaction.set(eventRef, updatedEvent)
+            updatedEvent
+        }.await()
+    }
+
+    suspend fun fetchEventRating(eventId: String, actorId: String): Int? {
+        return try {
+            firestore.collection(EVENTS_COLLECTION)
+                .document(eventId)
+                .collection(EVENT_RATINGS_COLLECTION)
+                .document(actorId)
+                .get()
+                .await()
+                .getLong("rating")
+                ?.toInt()
+                ?.coerceIn(1, 5)
+        } catch (_: FirebaseFirestoreException) {
+            null
+        }
     }
 
     suspend fun pushUser(user: User) {
-        firestore.collection("users").document(user.id)
+        firestore.collection(USERS_COLLECTION).document(user.id)
             .set(user).await()
+    }
+
+    suspend fun updateUserProfile(user: User) {
+        firestore.collection(USERS_COLLECTION).document(user.id)
+            .set(
+                mapOf(
+                    "username" to user.username,
+                    "displayName" to user.displayName,
+                    "profileImageUrl" to user.profileImageUrl,
+                    "email" to user.email,
+                    "discoveryRadiusKm" to user.discoveryRadiusKm,
+                    "points" to user.points,
+                    "eventsPublishedCount" to user.eventsPublishedCount,
+                    "validationsMadeCount" to user.validationsMadeCount,
+                    "lastUpdated" to user.lastUpdated
+                ),
+                SetOptions.merge()
+            ).await()
     }
 
     // Check if a username exists in Firestore (excluding a specific userId)
     suspend fun isUsernameTaken(username: String, excludingUserId: String? = null): Boolean {
         return try {
-            val docs = firestore.collection("users").whereEqualTo("username", username).get().await().documents
+            val docs = firestore.collection(USERS_COLLECTION).whereEqualTo("username", username).get().await().documents
             when {
                 docs.isEmpty() -> false
                 excludingUserId == null -> true
@@ -67,11 +134,11 @@ class FirebaseModel private constructor() {
     suspend fun deleteUserAndEvents(userId: String) {
         try {
             // delete user doc
-            firestore.collection("users").document(userId).delete().await()
+            firestore.collection(USERS_COLLECTION).document(userId).delete().await()
             // delete events by querying publisherId
-            val events = firestore.collection("events").whereEqualTo("publisherId", userId).get().await()
+            val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
             for (doc in events.documents) {
-                firestore.collection("events").document(doc.id).delete().await()
+                firestore.collection(EVENTS_COLLECTION).document(doc.id).delete().await()
             }
         } catch (_: FirebaseFirestoreException) {
             // ignore permission or network failures in best-effort cleanup
@@ -80,7 +147,7 @@ class FirebaseModel private constructor() {
 
     suspend fun fetchUsersSince(since: Long): List<User> {
         return try {
-            firestore.collection("users")
+            firestore.collection(USERS_COLLECTION)
                 .whereGreaterThan("lastUpdated", since)
                 .get()
                 .await()
@@ -92,13 +159,13 @@ class FirebaseModel private constructor() {
     }
 
     suspend fun pushEvent(event: Event) {
-        firestore.collection("events").document(event.id)
+        firestore.collection(EVENTS_COLLECTION).document(event.id)
             .set(event).await()
     }
 
     suspend fun fetchEventsSince(since: Long): List<Event> {
         return try {
-            firestore.collection("events")
+            firestore.collection(EVENTS_COLLECTION)
                 .whereGreaterThan("lastUpdated", since)
                 .get()
                 .await()
@@ -111,7 +178,7 @@ class FirebaseModel private constructor() {
 
     suspend fun fetchUserById(id: String): User? {
         return try {
-            firestore.collection("users")
+            firestore.collection(USERS_COLLECTION)
                 .document(id)
                 .get()
                 .await()

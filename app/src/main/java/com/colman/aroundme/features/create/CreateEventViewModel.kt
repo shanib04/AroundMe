@@ -7,12 +7,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
+import com.colman.aroundme.data.remote.ImageUploader
 import com.colman.aroundme.data.repository.EventRepository
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 import java.util.UUID
 
 sealed class CreateEventUiState {
@@ -38,6 +37,8 @@ class CreateEventViewModel(
 
     private val _editingEvent = MutableLiveData<Event?>(null)
     val editingEvent: LiveData<Event?> = _editingEvent
+
+    private val imageUploader = ImageUploader()
 
     fun setTags(tags: List<String>) {
         _tags.value = tags
@@ -137,9 +138,7 @@ class CreateEventViewModel(
                 var imageUrl = sourceEvent?.imageUrl.orEmpty()
 
                 if (imageUri != null) {
-                    val storageRef = FirebaseStorage.getInstance().reference.child("events/$eventId.jpg")
-                    storageRef.putFile(imageUri).await()
-                    imageUrl = storageRef.downloadUrl.await().toString()
+                    imageUrl = imageUploader.upload(imageUri, "events/$eventId.jpg")
                 }
 
                 val event = Event(
@@ -192,9 +191,7 @@ class CreateEventViewModel(
                 val existing = repository.getEventById(eventId).firstOrNull()
                     ?: throw IllegalStateException("Event not found")
                 val updatedImageUrl = if (imageUri != null) {
-                    val storageRef = FirebaseStorage.getInstance().reference.child("events/$eventId.jpg")
-                    storageRef.putFile(imageUri).await()
-                    storageRef.downloadUrl.await().toString()
+                    imageUploader.upload(imageUri, "events/$eventId.jpg")
                 } else {
                     existing.imageUrl
                 }

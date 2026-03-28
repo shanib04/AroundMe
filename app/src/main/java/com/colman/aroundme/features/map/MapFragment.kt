@@ -43,6 +43,7 @@ import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -51,8 +52,10 @@ class MapFragment : Fragment() {
     private var _binding: FragmentMapBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentMapBinding accessed outside of onCreateView/onDestroyView" }
 
+    private val userRepository by lazy { com.colman.aroundme.data.repository.UserRepository.getInstance(requireContext()) }
+
     private val viewModel: MapViewModel by viewModels {
-        MapViewModel.Factory(EventRepository.getInstance(requireContext()))
+        MapViewModel.Factory(EventRepository.getInstance(requireContext()), 15f)
     }
 
     private lateinit var categoryAdapter: CategoryFilterAdapter
@@ -62,6 +65,7 @@ class MapFragment : Fragment() {
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private var geocoderJob: Job? = null
+    private var radiusBootstrapJob: Job? = null
 
     private val locationPermissionRequest = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -111,12 +115,44 @@ class MapFragment : Fragment() {
 
                 setupMap()
                 observeViewModel()
+                bootstrapSavedRadius()
 
                 locationPermissionRequest.launch(arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ))
             }
+        }
+    }
+
+    private fun bootstrapSavedRadius() {
+        radiusBootstrapJob?.cancel()
+        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (currentUserId.isBlank()) {
+            applySavedRadius(15f)
+            return
+        }
+
+        radiusBootstrapJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+            userRepository.refreshUserFromRemote(currentUserId)
+            val savedRadius = runCatching {
+                userRepository.getUserById(currentUserId).first()?.discoveryRadiusKm?.toFloat()
+            }.getOrNull() ?: 15f
+
+            withContext(Dispatchers.Main) {
+                applySavedRadius(savedRadius)
+            }
+        }
+    }
+
+    private fun applySavedRadius(savedRadius: Float) {
+        if (_binding == null) return
+        viewModel.updateRadius(savedRadius)
+        binding.radiusSlider.value = savedRadius
+        binding.radiusValueText.text = if (savedRadius % 1.0f == 0.0f) {
+            "${savedRadius.toInt()} km"
+        } else {
+            "${"%.1f".format(savedRadius)} km"
         }
     }
 
@@ -543,6 +579,7 @@ class MapFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        radiusBootstrapJob?.cancel()
         super.onDestroyView()
         _binding = null
         googleMap = null

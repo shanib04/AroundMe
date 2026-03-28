@@ -42,6 +42,51 @@ class UserRepository private constructor(
         }
     }
 
+    suspend fun updateUserProfile(user: User, pushToRemote: Boolean = true) {
+        val normalized = user.normalizedForDisplay()
+        userDao.insert(normalized)
+        if (pushToRemote) {
+            firebase.updateUserProfile(normalized)
+        }
+    }
+
+    suspend fun awardEventCreated(userId: String, pointsAward: Int = 10) {
+        updateUserStats(userId) { existing ->
+            existing.copy(
+                points = existing.points + pointsAward,
+                eventsPublishedCount = existing.eventsPublishedCount + 1,
+                lastUpdated = System.currentTimeMillis()
+            )
+        }
+    }
+
+    suspend fun awardValidation(userId: String, pointsAward: Int = 2) {
+        updateUserStats(userId) { existing ->
+            existing.copy(
+                points = existing.points + pointsAward,
+                validationsMadeCount = existing.validationsMadeCount + 1,
+                lastUpdated = System.currentTimeMillis()
+            )
+        }
+    }
+
+    private suspend fun updateUserStats(userId: String, transform: (User) -> User) {
+        val normalizedUserId = normalizeUserStatsId(userId)
+        if (normalizedUserId.isBlank()) return
+        val current = userDao.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val updated = transform(current).normalizedForDisplay()
+        userDao.insert(updated)
+        runCatching { firebase.updateUserProfile(updated) }
+    }
+
+    private fun normalizeUserStatsId(userId: String): String {
+        val trimmedId = userId.trim()
+        return when {
+            trimmedId.startsWith("user:") -> trimmedId.removePrefix("user:")
+            else -> trimmedId
+        }
+    }
+
     // Check remote Firestore if username is taken (best-effort)
     suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
         return try {
@@ -78,9 +123,9 @@ class UserRepository private constructor(
     }
 
     private fun User.normalizedForDisplay(): User {
-        val safeDisplayName = displayName.takeIf { it.isNotBlank() }
+        val safeDisplayName = displayName
+            .takeIf { it.isNotBlank() }
             ?: username.takeIf { it.isNotBlank() }
-            ?: name.takeIf { it.isNotBlank() }
             ?: com.colman.aroundme.features.feed.EventTextFormatter.unknownPublisherText()
         return copy(displayName = safeDisplayName)
     }
