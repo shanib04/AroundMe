@@ -43,39 +43,36 @@ private class RegisterValidationHelper(
 
         var displayNameError: String? = null
         var usernameError: String? = null
-        var emailError: String? = null
-        var passwordError: String? = null
-        var confirmPasswordError: String? = null
         val profileImageError: String? = null
 
         val usernameRegex = Regex("^[a-z0-9_]{3,15}$")
         val displayNameRegex = Regex("^[a-zA-Z0-9_\\- ]{1,20}$")
 
         if (trimmedDisplayName.isBlank()) {
-            displayNameError = "Display name is required."
+            displayNameError = strings.displayNameRequired
         } else if (!displayNameRegex.matches(trimmedDisplayName)) {
-            displayNameError = "Display name can contain letters, numbers, spaces, '-' and '_' (max 20)."
+            displayNameError = strings.displayNameInvalid
         }
 
         if (trimmedUsername.isBlank()) {
-            usernameError = "Username is required."
+            usernameError = strings.usernameRequired
         } else if (!usernameRegex.matches(trimmedUsername)) {
-            usernameError = "Username can only contain lowercase letters, numbers, and underscores (3-15 chars)."
+            usernameError = strings.usernameInvalid
         }
 
-        emailError = when {
+        val emailError = when {
             trimmedEmail.isBlank() -> strings.emailRequired
             !emailMatcher(trimmedEmail) -> strings.invalidEmail
             else -> null
         }
 
-        passwordError = when {
+        val passwordError = when {
             password.isBlank() -> strings.passwordRequired
             password.length < 6 -> strings.passwordTooShort
             else -> null
         }
 
-        confirmPasswordError = when {
+        val confirmPasswordError = when {
             confirmPassword.isBlank() -> strings.confirmPasswordRequired
             password != confirmPassword -> strings.passwordMismatch
             else -> null

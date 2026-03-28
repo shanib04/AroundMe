@@ -2,6 +2,10 @@ package com.colman.aroundme.features.auth.register
 
 // String provider for register validation and error states
 data class RegisterStrings(
+    val displayNameRequired: String,
+    val displayNameInvalid: String,
+    val usernameRequired: String,
+    val usernameInvalid: String,
     val emailRequired: String,
     val invalidEmail: String,
     val passwordRequired: String,

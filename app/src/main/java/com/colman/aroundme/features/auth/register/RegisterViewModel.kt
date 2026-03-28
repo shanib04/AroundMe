@@ -19,6 +19,10 @@ class RegisterViewModel(
 ) : AndroidViewModel(application) {
 
     private val strings = RegisterStrings(
+        displayNameRequired = getString(R.string.error_display_name_required),
+        displayNameInvalid = getString(R.string.error_display_name_invalid),
+        usernameRequired = getString(R.string.error_username_required),
+        usernameInvalid = getString(R.string.error_username_invalid),
         emailRequired = getString(R.string.error_email_required),
         invalidEmail = getString(R.string.invalid_email),
         passwordRequired = getString(R.string.error_password_required),
@@ -124,15 +128,15 @@ class RegisterViewModel(
         val displayNameRegex = Regex("^[a-zA-Z0-9_\\- ]{1,20}$")
 
         if (trimmedDisplayName.isBlank()) {
-            displayNameError = "Display name is required."
+            displayNameError = strings.displayNameRequired
         } else if (!displayNameRegex.matches(trimmedDisplayName)) {
-            displayNameError = "Display name can contain letters, numbers, spaces, '-' and '_' (max 20)."
+            displayNameError = strings.displayNameInvalid
         }
 
         if (trimmedUsername.isBlank()) {
-            usernameError = "Username is required."
+            usernameError = strings.usernameRequired
         } else if (!usernameRegex.matches(trimmedUsername)) {
-            usernameError = "Username can only contain lowercase letters, numbers, and underscores (3-15 chars)."
+            usernameError = strings.usernameInvalid
         }
 
         if (trimmedEmail.isBlank()) {

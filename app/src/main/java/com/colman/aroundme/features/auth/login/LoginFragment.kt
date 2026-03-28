@@ -31,7 +31,7 @@ class LoginFragment : Fragment() {
     private val binding get() = requireNotNull(_binding) { "FragmentLoginBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: LoginViewModel by viewModels {
-        LoginViewModel.Factory()
+        LoginViewModel.Factory(requireActivity().application)
     }
 
     private lateinit var credentialManager: CredentialManager
@@ -179,13 +179,13 @@ class LoginFragment : Fragment() {
             .setTitle(getString(R.string.google_sign_in_failed))
             .setMessage(message)
             .setCancelable(false)
-            .setNegativeButton("Use email/password") { dialog, _ ->
+            .setNegativeButton(getString(R.string.login_use_email_password)) { dialog, _ ->
                 dialog.dismiss()
                 val identifier = binding.emailEditText.text?.toString().orEmpty()
                 val password = binding.passwordEditText.text?.toString().orEmpty()
                 viewModel.loginWithIdentifierAndPassword(identifier, password)
             }
-            .setPositiveButton("Retry") { dialog, _ ->
+            .setPositiveButton(getString(R.string.retry)) { dialog, _ ->
                 dialog.dismiss()
                 launchGoogleSignIn()
             }

@@ -9,6 +9,16 @@
     <string name="sign_up_now">Sign up now</string>
     <string name="or">OR</string>
     <string name="invalid_email">Please enter a valid email address.</string>
+    <string name="error_display_name_required">Display name is required.</string>
+    <string name="error_display_name_invalid">Display name can contain letters, numbers, spaces, \'-\' and \'_\' (max 20).</string>
+    <string name="error_username_required">Username is required.</string>
+    <string name="error_username_invalid">Username can only contain lowercase letters, numbers, and underscores (3-15 chars).</string>
+    <string name="error_login_credentials_required">Email/username and password are required.</string>
+    <string name="error_login_failed">Unable to sign in.</string>
+    <string name="error_login_google_token_missing">Google sign-in failed. Missing ID token.</string>
+    <string name="error_login_google_failed">Unable to sign in with Google.</string>
+    <string name="login_use_email_password">Use email/password</string>
+    <string name="retry">Retry</string>
     <string name="google_sign_in_failed">Google sign-in failed.</string>
     <string name="google_sign_in_cancelled">Google sign-in was cancelled.</string>
     <string name="google_sign_in_token_missing">Google sign-in did not return an ID token.</string>
