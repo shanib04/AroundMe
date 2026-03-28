@@ -82,12 +82,20 @@
         <action
             android:id="@+id/action_profileFragment_to_editProfileFragment"
             app:destination="@id/editProfileFragment" />
+        <action
+            android:id="@+id/action_profileFragment_to_achievementsHistoryFragment"
+            app:destination="@id/achievementsHistoryFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/editProfileFragment"
         android:name="com.colman.aroundme.features.profile.EditProfileFragment"
         android:label="Edit Profile" />
+
+    <fragment
+        android:id="@+id/achievementsHistoryFragment"
+        android:name="com.colman.aroundme.features.profile.AchievementsHistoryFragment"
+        android:label="Achievements History" />
 
     <fragment
         android:id="@+id/myEventsFragment"

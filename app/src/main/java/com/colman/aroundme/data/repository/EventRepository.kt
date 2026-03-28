@@ -29,6 +29,7 @@ class EventRepository private constructor(
     private val firebase: FirebaseModel,
     private val identityRepository: IdentityRepository,
     private val firestore: FirebaseFirestore
+    private val userRepository: UserRepository
 ) {
 
     init {
@@ -99,9 +100,13 @@ class EventRepository private constructor(
     }
 
     suspend fun upsertEvent(event: Event, pushToRemote: Boolean = true) {
+        val existingEvent = eventDao.getByIdNow(event.id)
         eventDao.insert(event)
         if (pushToRemote) {
             firebase.pushEvent(event)
+        }
+        if (existingEvent == null) {
+            userRepository.awardEventCreated(event.publisherId)
         }
     }
 
@@ -121,13 +126,71 @@ class EventRepository private constructor(
         }
     }
 
+    suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = voteType,
+            rating = existingInteraction?.rating ?: 0,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+        if (existingInteraction?.voteType == null) {
+            userRepository.awardValidation(actorId)
+        }
+        return recalculateEventAggregates(currentEvent)
+    }
+
+    suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {
+        val normalizedRating = rating.coerceIn(1, 5)
+        val actorId = identityRepository.getActorId()
+        val currentEvent = eventDao.getByIdNow(eventId) ?: return null
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedInteraction = EventInteraction(
+            eventId = eventId,
+            actorId = actorId,
+            voteType = existingInteraction?.voteType,
+            rating = normalizedRating,
+            lastUpdated = System.currentTimeMillis()
+        )
+        eventInteractionDao.upsert(updatedInteraction)
+
+        val localUpdatedEvent = recalculateEventAggregates(currentEvent, pushToRemote = false)
+
+        val remoteUpdatedEvent = try {
+            firebase.updateEventRatingAggregate(eventId, actorId, normalizedRating)
+        } catch (e: Exception) {
+            Log.e(TAG, "submitRating remote aggregate sync failed", e)
+            null
+        }
+
+        eventDao.insert(remoteUpdatedEvent ?: localUpdatedEvent)
+        return updatedInteraction
+    }
+
     fun syncFromRemote(since: Long = 0L) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val remote = firebase.fetchEventsSince(since)
+                val actorId = identityRepository.getActorId()
                 for (r in remote) {
-                    // insert/replace local record
                     eventDao.insert(r)
+                    val remoteRating = firebase.fetchEventRating(r.id, actorId)
+                    if (remoteRating != null) {
+                        val existingInteraction = eventInteractionDao.getInteraction(r.id, actorId)
+                        eventInteractionDao.upsert(
+                            EventInteraction(
+                                eventId = r.id,
+                                actorId = actorId,
+                                voteType = existingInteraction?.voteType,
+                                rating = remoteRating,
+                                lastUpdated = maxOf(existingInteraction?.lastUpdated ?: 0L, r.lastUpdated)
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "syncFromRemote failed", e)
@@ -318,6 +381,10 @@ class EventRepository private constructor(
         }
     }
 
+    suspend fun getValidationCountForActor(actorId: String): Int {
+        return eventInteractionDao.getValidationCountForActor(actorId)
+    }
+
     fun observeInteraction(eventId: String) =
         eventInteractionDao.observeInteraction(eventId, identityRepository.getActorId())
 
@@ -446,18 +513,25 @@ class EventRepository private constructor(
         val updatedEvent = event.copy(
             activeVotes = activeVotes,
             inactiveVotes = inactiveVotes,
-            averageRating = if (ratings.isEmpty()) 0.0 else ratings.average(),
+            averageRating = calculateAverageRating(ratings),
             ratingCount = ratings.size,
             lastUpdated = System.currentTimeMillis()
         )
 
         eventDao.insert(updatedEvent)
-        try {
-            firebase.pushEvent(updatedEvent)
-        } catch (e: Exception) {
-            Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
+        if (pushToRemote) {
+            try {
+                firebase.pushEvent(updatedEvent)
+            } catch (e: Exception) {
+                Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
+            }
         }
         return updatedEvent
+    }
+
+    internal fun calculateAverageRating(ratings: List<Int>): Double {
+        val validRatings = ratings.filter { it in 1..5 }
+        return if (validRatings.isEmpty()) 0.0 else validRatings.average()
     }
 
     companion object {
@@ -480,7 +554,7 @@ class EventRepository private constructor(
                 eventInteractionDao = db.eventInteractionDao(),
                 firebase = FirebaseModel.getInstance(),
                 identityRepository = IdentityRepository(context),
-                firestore = FirebaseFirestore.getInstance()
+                userRepository = UserRepository.getInstance(context)
             )
             INSTANCE = repo
             repo

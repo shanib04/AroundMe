@@ -97,7 +97,6 @@ class FeedFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         setupRecyclerView()
         setupSortDropdown()
-        setupRefresh()
         observeViewModel()
         userSyncJob?.cancel()
         userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -122,16 +121,6 @@ class FeedFragment : Fragment() {
         binding.sortDropdown.setText(FeedSortOption.NEWEST.label, false)
         binding.sortDropdown.setOnItemClickListener { _, _, position, _ ->
             viewModel.setSortOption(FeedSortOption.entries[position])
-        }
-    }
-
-    private fun setupRefresh() {
-        binding.refreshButton.setOnClickListener {
-            lifecycleScope.launch {
-                userRepository.syncFromRemoteNow()
-            }
-            viewModel.refresh()
-            requestLocationForDistance()
         }
     }
 
@@ -164,8 +153,6 @@ class FeedFragment : Fragment() {
 
         eventAdapter.submitList(state.items)
         binding.loadingMoreIndicator.isVisible = state.isLoadingMore && state.items.isNotEmpty()
-        binding.refreshButton.alpha = if (state.isRefreshing) 0.5f else 1f
-        binding.refreshButton.isEnabled = !state.isRefreshing
         binding.emptyText.isVisible = state.items.isEmpty()
         binding.emptyText.text = state.emptyMessage
         binding.feedRecyclerView.isVisible = state.items.isNotEmpty()

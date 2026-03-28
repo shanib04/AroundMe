@@ -12,7 +12,7 @@ class IdentityRepository(
 
     fun getActorId(): String {
         val userId = firebaseAuth.currentUser?.uid
-        if (!userId.isNullOrBlank()) return "user:$userId"
+        if (!userId.isNullOrBlank()) return userId
 
         val existing = preferences.getString(KEY_DEVICE_ID, null)
         if (!existing.isNullOrBlank()) return existing
@@ -27,4 +27,3 @@ class IdentityRepository(
         private const val KEY_DEVICE_ID = "device_id"
     }
 }
-

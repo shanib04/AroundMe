@@ -56,24 +56,34 @@ class MyEventsFragment : Fragment() {
             userRepository.syncFromRemoteNow()
         }
         binding.feedTitleText.text = getString(R.string.my_events_title)
+        binding.feedTitleText.setPadding(
+            binding.feedTitleText.paddingLeft,
+            binding.feedTitleText.paddingTop,
+            binding.feedTitleText.paddingRight,
+            resources.getDimensionPixelSize(R.dimen.my_events_title_bottom_padding)
+        )
         binding.sortInputLayout.isVisible = false
-        binding.refreshButton.isVisible = false
         binding.loadingMoreIndicator.isVisible = false
         binding.feedRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.feedRecyclerView.adapter = adapter
 
-        viewModel.events.observe(viewLifecycleOwner) { events ->
+        viewModel.events.observe(viewLifecycleOwner) { rows ->
             ensureUsersJob?.cancel()
             ensureUsersJob = lifecycleScope.launch {
-                userRepository.ensureUsersLoaded(events.map { it.item.event.publisherId })
+                userRepository.ensureUsersLoaded(
+                    rows.mapNotNull { row ->
+                        (row as? MyEventRow.EventRow)?.item?.event?.publisherId
+                    }
+                )
             }
-            events.forEach { myEvent ->
-                if (myEvent.item.hostName == EventTextFormatter.unknownPublisherText() && myEvent.item.event.publisherId.isNotBlank()) {
-                    userRepository.refreshUserFromRemote(myEvent.item.event.publisherId)
+            rows.forEach { row ->
+                val eventRow = row as? MyEventRow.EventRow ?: return@forEach
+                if (eventRow.item.hostName == EventTextFormatter.unknownPublisherText() && eventRow.item.event.publisherId.isNotBlank()) {
+                    userRepository.refreshUserFromRemote(eventRow.item.event.publisherId)
                 }
             }
-            adapter.submitList(events)
-            binding.emptyText.isVisible = events.isEmpty()
+            adapter.submitList(rows)
+            binding.emptyText.isVisible = rows.none { it is MyEventRow.EventRow }
             binding.emptyText.text = getString(R.string.my_events_empty)
         }
     }
