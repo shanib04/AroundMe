@@ -12,7 +12,7 @@ import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.places.Place
 import com.colman.aroundme.data.repository.EventRepository
-import com.colman.aroundme.data.repository.PlacesRepositoryImpl
+import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -24,7 +24,7 @@ class EventDetailsViewModel(
     private val eventId: String,
     private val eventRepository: EventRepository,
     private val userRepository: UserRepository,
-    private val placesRepository: PlacesRepositoryImpl,
+    private val placesRepository: PlacesRepository,
     private val firebaseModel: FirebaseModel
 ) : ViewModel() {
 
@@ -195,7 +195,7 @@ class EventDetailsViewModel(
         private val eventId: String,
         private val eventRepository: EventRepository,
         private val userRepository: UserRepository,
-        private val placesRepository: PlacesRepositoryImpl,
+        private val placesRepository: PlacesRepository,
         private val firebaseModel: FirebaseModel
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

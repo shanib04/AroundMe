@@ -10,7 +10,7 @@ object NetworkClient {
 
     private val okHttpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .addInterceptor(PlacesAuthInterceptor())
+            .addInterceptor(PlacesApiKeyAppender())
             .build()
     }
 
