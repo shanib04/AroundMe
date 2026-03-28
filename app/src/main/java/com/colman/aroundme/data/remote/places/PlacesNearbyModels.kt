@@ -16,4 +16,3 @@ data class PlaceResult(
     @SerializedName("user_ratings_total") val userRatingsTotal: Int? = null,
     @SerializedName("place_id") val placeId: String? = null
 )
-
