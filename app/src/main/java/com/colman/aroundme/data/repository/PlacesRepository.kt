@@ -6,7 +6,7 @@ import com.colman.aroundme.data.remote.places.PlacesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-class PlacesRepositoryImpl(
+class PlacesRepository private constructor(
     private val placesApi: PlacesApi
 ) {
 
@@ -46,12 +46,12 @@ class PlacesRepositoryImpl(
 
     companion object {
         @Volatile
-        private var INSTANCE: PlacesRepositoryImpl? = null
+        private var INSTANCE: PlacesRepository? = null
 
-        fun getInstance(): PlacesRepositoryImpl = INSTANCE ?: synchronized(this) {
-            val repo = PlacesRepositoryImpl(NetworkClient.placesApiClient)
-            INSTANCE = repo
-            repo
+        fun getInstance(): PlacesRepository = INSTANCE ?: synchronized(this) {
+            val repository = PlacesRepository(NetworkClient.placesApiClient)
+            INSTANCE = repository
+            repository
         }
     }
 }
