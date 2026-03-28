@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -128,7 +129,7 @@ class AuthRepository(
     }
 
     private suspend fun uploadProfileImage(userId: String, imageUri: Uri): String {
-        val imageRef = storage.reference.child("images/$userId.jpg")
+        val imageRef = storage.reference.child(ProfileImageStoragePath.forUser(userId))
         imageRef.putFile(imageUri).await()
         return imageRef.downloadUrl.await().toString()
     }
