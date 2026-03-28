@@ -57,6 +57,13 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Keep unit tests enabled; configure options here if needed.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {

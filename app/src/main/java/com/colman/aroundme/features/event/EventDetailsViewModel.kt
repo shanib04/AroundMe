@@ -17,6 +17,7 @@ import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class EventDetailsViewModel(
     private val eventId: String,
@@ -112,15 +113,17 @@ class EventDetailsViewModel(
         if (_isSubmittingRating.value == true) return
         if (rating !in 1.0..5.0) return
 
+        val normalizedRating = rating.roundToInt().coerceIn(1, 5)
+
         // optimistic UI
-        _myRating.value = rating.toInt()
+        _myRating.value = normalizedRating
 
         viewModelScope.launch {
             _isSubmittingRating.value = true
             try {
-                eventRepository.submitRating(eventId, rating)
+                eventRepository.submitRating(eventId, normalizedRating)
                 // observeMyInteraction() will update _myRating from DB, but keep it consistent here too.
-                _myRating.value = rating.toInt()
+                _myRating.value = normalizedRating
             } finally {
                 _isSubmittingRating.value = false
             }
