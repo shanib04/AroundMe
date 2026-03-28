@@ -1,7 +1,5 @@
 package com.colman.aroundme.features.auth.register
 
-import android.app.Activity
-import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
@@ -10,19 +8,26 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.isVisible
+import androidx.credentials.Credential
+import androidx.credentials.CredentialManager
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
 import com.colman.aroundme.databinding.FragmentRegisterBinding
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 
@@ -35,7 +40,8 @@ class RegisterFragment : Fragment() {
         RegisterViewModel.Factory(requireActivity().application)
     }
 
-    private lateinit var googleSignInClient: GoogleSignInClient
+    private lateinit var credentialManager: CredentialManager
+    private lateinit var googleSignUpRequest: GetCredentialRequest
     private var selectedImageUri: Uri? = null
 
     private val getContentLauncher = registerForActivityResult(
@@ -57,18 +63,6 @@ class RegisterFragment : Fragment() {
             viewModel.clearFieldErrors()
             loadImage(uri)
         }
-    }
-
-    // Launcher for GoogleSignIn intent
-    private val googleIntentLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) {
-            viewModel.resetState()
-            showMessage(getString(R.string.google_sign_up_cancelled))
-            return@registerForActivityResult
-        }
-        handleLegacyGoogleSignInResult(result.data)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,10 +107,7 @@ class RegisterFragment : Fragment() {
             }
 
             googleButton.setOnClickListener {
-                // Start the Google Sign-In intent
-                googleSignInClient.signInIntent.also { intent ->
-                    googleIntentLauncher.launch(intent)
-                }
+                launchGoogleSignUp()
             }
         }
     }
@@ -200,27 +191,50 @@ class RegisterFragment : Fragment() {
 
     private fun configureGoogleSignIn() {
         val webClientId = getString(R.string.default_web_client_id)
-        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(webClientId)
-            .requestEmail()
+        credentialManager = CredentialManager.create(requireContext())
+        val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(webClientId)
             .build()
-        googleSignInClient = GoogleSignIn.getClient(requireContext(), options)
+        googleSignUpRequest = GetCredentialRequest.Builder()
+            .addCredentialOption(signInWithGoogleOption)
+            .build()
     }
 
-    private fun handleLegacyGoogleSignInResult(data: Intent?) {
-        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+    private fun launchGoogleSignUp() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val response = credentialManager.getCredential(requireActivity(), googleSignUpRequest)
+                handleGoogleCredential(response.credential)
+            } catch (_: GetCredentialCancellationException) {
+                viewModel.resetState()
+                showMessage(getString(R.string.google_sign_up_cancelled))
+            } catch (ex: GetCredentialException) {
+                viewModel.resetState()
+                showMessage(ex.localizedMessage ?: getString(R.string.google_sign_up_failed))
+            } catch (t: Throwable) {
+                viewModel.resetState()
+                showMessage(t.localizedMessage ?: getString(R.string.google_sign_up_failed))
+            }
+        }
+    }
+
+    private fun handleGoogleCredential(credential: Credential) {
+        if (credential !is CustomCredential ||
+            credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        ) {
+            showMessage(getString(R.string.google_sign_up_failed))
+            return
+        }
+
         try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account?.idToken
+            val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
+            val idToken = googleIdTokenCredential.idToken
             if (idToken.isNullOrBlank()) {
                 showMessage(getString(R.string.google_sign_in_token_missing))
                 return
             }
             viewModel.registerWithGoogle(idToken)
-        } catch (ex: ApiException) {
-            showMessage(ex.localizedMessage ?: getString(R.string.google_sign_up_failed))
-        } catch (t: Throwable) {
-            showMessage(t.localizedMessage ?: getString(R.string.google_sign_up_failed))
+        } catch (_: GoogleIdTokenParsingException) {
+            showMessage(getString(R.string.google_sign_up_failed))
         }
     }
 
