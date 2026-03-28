@@ -10,8 +10,9 @@ import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.remote.places.Place
 import com.colman.aroundme.data.repository.EventRepository
-import com.colman.aroundme.data.repository.PlacesRepository
+import com.colman.aroundme.data.repository.PlacesRepositoryImpl
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -23,7 +24,7 @@ class EventDetailsViewModel(
     private val eventId: String,
     private val eventRepository: EventRepository,
     private val userRepository: UserRepository,
-    private val placesRepository: PlacesRepository,
+    private val placesRepository: PlacesRepositoryImpl,
     private val firebaseModel: FirebaseModel
 ) : ViewModel() {
 
@@ -161,8 +162,9 @@ class EventDetailsViewModel(
 
             result
                 .onSuccess { places ->
-                    placesCache[type.placesType] = places
-                    _nearbyPlaces.value = places
+                    val mappedPlaces = places.mapNotNull(::toNearbyPlace)
+                    placesCache[type.placesType] = mappedPlaces
+                    _nearbyPlaces.value = mappedPlaces
                 }
                 .onFailure { e ->
                     _nearbyPlaces.value = emptyList()
@@ -173,11 +175,27 @@ class EventDetailsViewModel(
         }
     }
 
+    private fun toNearbyPlace(place: Place): NearbyPlace? {
+        val name = place.name?.trim().orEmpty()
+        val vicinity = place.vicinity?.trim().orEmpty()
+        if (name.isBlank()) return null
+
+        return NearbyPlace(
+            name = name,
+            vicinity = vicinity,
+            iconUrl = place.icon.orEmpty(),
+            photoUrl = null,
+            rating = place.rating,
+            ratingsTotal = place.userRatingsTotal,
+            placeId = place.placeId
+        )
+    }
+
     class Factory(
         private val eventId: String,
         private val eventRepository: EventRepository,
         private val userRepository: UserRepository,
-        private val placesRepository: PlacesRepository,
+        private val placesRepository: PlacesRepositoryImpl,
         private val firebaseModel: FirebaseModel
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
