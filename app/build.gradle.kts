@@ -27,9 +27,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
+
         val mapsApiKey = localProperties.getProperty("MAPS_API_KEY") ?: "YOUR_API_KEY_HERE"
         manifestPlaceholders["mapsApiKey"] = mapsApiKey
+
+        // Expose the key to Kotlin as BuildConfig.MAPS_API_KEY for Places REST too
+        buildConfigField("String", "MAPS_API_KEY", "\"$mapsApiKey\"")
     }
 
     buildTypes {
@@ -41,6 +44,7 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -51,6 +55,14 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
+    }
+
+    testOptions {
+        unitTests {
+            // Keep unit tests enabled; configure options here if needed.
+            isReturnDefaultValues = true
+        }
     }
 }
 
@@ -80,6 +92,13 @@ dependencies {
     implementation("com.squareup.picasso:picasso:2.8")
 
     implementation("com.firebase:geofire-android-common:3.2.0")
+
+    // Retrofit (Google Places REST)
+    implementation(libs.retrofit)
+    implementation(libs.gson)
+    implementation(libs.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
 
     // Room
     implementation("androidx.room:room-ktx:2.5.2")

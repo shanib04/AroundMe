@@ -18,7 +18,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.colman.aroundme.R
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
@@ -36,7 +35,7 @@ class FeedFragment : Fragment() {
 
     private var _binding: FragmentFeedBinding? = null
     private val binding: FragmentFeedBinding
-        get() = requireNotNull(_binding)
+        get() = requireNotNull(_binding) { "FragmentFeedBinding accessed outside of view lifecycle" }
 
     private val viewModel: FeedViewModel by viewModels {
         FeedViewModel.Factory(
@@ -127,11 +126,16 @@ class FeedFragment : Fragment() {
 
     private fun observeViewModel() {
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
+            // If fragment view is already destroyed, ignore emissions.
+            if (_binding == null) return@observe
+
             ensureUsersJob?.cancel()
-            ensureUsersJob = lifecycleScope.launch {
+            ensureUsersJob = viewLifecycleOwner.lifecycleScope.launch {
+                // this runs on main; fine, but avoid heavy Remote fetch per emission
                 userRepository.ensureUsersLoaded(state.items.map { it.item.event.publisherId })
             }
             state.items.forEach { feedItem ->
+                if (_binding == null) return@forEach
                 if (feedItem.item.hostName == EventTextFormatter.unknownPublisherText() && feedItem.item.event.publisherId.isNotBlank()) {
                     userRepository.refreshUserFromRemote(feedItem.item.event.publisherId)
                 }
@@ -141,6 +145,8 @@ class FeedFragment : Fragment() {
     }
 
     private fun render(state: FeedUiState) {
+        if (_binding == null) return
+
         if (binding.sortDropdown.text?.toString() != state.sortOption.label) {
             binding.sortDropdown.setText(state.sortOption.label, false)
         }
@@ -215,10 +221,8 @@ class FeedFragment : Fragment() {
     }
 
     private fun openEventDetails(eventId: String) {
-        val bundle = Bundle().apply {
-            putString("eventId", eventId)
-        }
-        findNavController().navigate(R.id.action_feedFragment_to_eventDetailsFragment, bundle)
+        val action = FeedFragmentDirections.actionFeedFragmentToEventDetailsFragment(eventId)
+        findNavController().navigate(action)
     }
 
     private fun submitVote(eventId: String, isActiveVote: Boolean) {
@@ -227,11 +231,13 @@ class FeedFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        // Cancel jobs first to prevent callbacks trying to access a cleared binding.
         ensureUsersJob?.cancel()
         userSyncJob?.cancel()
         locationTokenSource?.cancel()
-        binding.feedRecyclerView.removeOnScrollListener(feedScrollListener)
-        binding.feedRecyclerView.adapter = null
+
+        _binding?.feedRecyclerView?.removeOnScrollListener(feedScrollListener)
+        _binding?.feedRecyclerView?.adapter = null
         _binding = null
         super.onDestroyView()
     }

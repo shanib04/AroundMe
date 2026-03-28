@@ -118,7 +118,12 @@ class FeedViewModel(
         interactionCache = interactionCache + (eventId to voteType)
         publishState()
         viewModelScope.launch {
-            repository.submitVote(eventId, voteType)
+            val updated = repository.submitVote(eventId, voteType)
+            // If repository returned an updated event from local cache, update the list immediately.
+            if (updated != null) {
+                sourceEvents = sourceEvents.map { if (it.id == updated.id) updated else it }
+                publishState()
+            }
             syncInteractionCache(sourceEvents)
         }
     }

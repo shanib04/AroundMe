@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ds_surface">#f6f6f6</color>
+    <color name="ds_surface_low">#f0f1f1</color>
+    <color name="ds_surface_lowest">#ffffff</color>
+    <color name="ds_surface_container_high">#e1e3e3</color>
+
+    <color name="ds_on_surface">#2d2f2f</color>
+    <color name="ds_on_surface_variant">#5a5c5c</color>
+
+    <color name="ds_primary">#aa2c32</color>
+    <color name="ds_primary_container">#ff7574</color>
+    <color name="ds_on_primary">#ffefee</color>
+
+    <color name="ds_secondary">#00666a</color>
+    <color name="ds_on_secondary">#c9fcff</color>
+    <color name="ds_secondary_10">#1A00666A</color>
+</resources>

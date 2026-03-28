@@ -26,7 +26,7 @@ class EventAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): EventViewHolder {
         val binding = ViewEventCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return EventViewHolder(binding, onEventClick, onVoteClick)
+        return EventViewHolder(binding, onEventClick)
     }
 
     override fun onBindViewHolder(holder: EventViewHolder, position: Int) {
@@ -35,8 +35,7 @@ class EventAdapter(
 
     class EventViewHolder(
         private val binding: ViewEventCardBinding,
-        private val onEventClick: (String) -> Unit,
-        private val onVoteClick: (String, Boolean) -> Unit
+        private val onEventClick: (String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(feedItem: FeedEventItem) {
@@ -60,24 +59,15 @@ class EventAdapter(
             bindTags(item.tagLabels)
             bindImage(event.imageUrl)
             binding.eventDescriptionText.isVisible = event.description.isNotBlank()
-            updateVoteSelection(feedItem)
+
+            // Feed should NOT allow voting; it only shows vote counts.
+            binding.activeVotesButton.isClickable = false
+            binding.activeVotesButton.isFocusable = false
+            binding.inactiveVotesButton.isClickable = false
+            binding.inactiveVotesButton.isFocusable = false
 
             binding.root.setOnClickListener { onEventClick(event.id) }
             binding.moreButton.setOnClickListener { onEventClick(event.id) }
-            binding.activeVotesButton.setOnClickListener { onVoteClick(event.id, true) }
-            binding.inactiveVotesButton.setOnClickListener { onVoteClick(event.id, false) }
-        }
-
-        private fun updateVoteSelection(item: FeedEventItem) {
-            val selectedBackground = R.drawable.bg_live_badge_card
-            val defaultBackground = R.drawable.pill_white_rounded
-            val selectedTextColor = ContextCompat.getColor(binding.root.context, android.R.color.black)
-            val defaultTextColor = ContextCompat.getColor(binding.root.context, R.color.text_dark)
-
-            binding.activeVotesButton.setBackgroundResource(if (item.isActiveVoteSelected) selectedBackground else defaultBackground)
-            binding.inactiveVotesButton.setBackgroundResource(if (item.isInactiveVoteSelected) selectedBackground else defaultBackground)
-            binding.activeVotesText.setTextColor(if (item.isActiveVoteSelected) selectedTextColor else defaultTextColor)
-            binding.inactiveVotesText.setTextColor(if (item.isInactiveVoteSelected) selectedTextColor else defaultTextColor)
         }
 
         private fun bindTags(tagLabels: List<String>) {

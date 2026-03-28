@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Makes RatingBar stars yellow when filled. -->
+    <style name="AroundMeRatingBar" parent="Widget.AppCompat.RatingBar">
+        <item name="android:progressTint">@color/rating_yellow</item>
+        <item name="android:secondaryProgressTint">@color/rating_yellow</item>
+        <item name="android:indeterminateTint">@color/rating_yellow</item>
+    </style>
+
+</resources>

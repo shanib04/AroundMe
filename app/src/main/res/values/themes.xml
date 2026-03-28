@@ -1,6 +1,6 @@
 <resources>
     <!-- Base application theme. -->
-    <style name="Base.Theme.AroundMe" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.AroundMe" parent="Theme.Material3.Light.NoActionBar">
         <!-- Customize your light theme here. -->
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
@@ -20,5 +20,20 @@
     <style name="ShapeAppearance.AroundMe.ImageLarge" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">34dp</item>
+    </style>
+
+    <style name="ShapeAppearance.AroundMe.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <style name="ShapeAppearance.AroundMe.ImageSmall" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="CircleImageView" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
     </style>
 </resources>
