@@ -151,17 +151,18 @@ class EventRepository private constructor(
         val currentEvent = eventDao.getByIdNow(eventId) ?: return null
 
         val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val updatedVoteType = if (existingInteraction?.voteType == voteType) null else voteType
         val updatedInteraction = EventInteraction(
             eventId = eventId,
             actorId = actorId,
-            voteType = voteType,
+            voteType = updatedVoteType,
             rating = existingInteraction?.rating ?: 0,
             lastUpdated = System.currentTimeMillis()
         )
         eventInteractionDao.upsert(updatedInteraction)
 
         // Reward first-time validation/vote
-        if (existingInteraction?.voteType == null) {
+        if (existingInteraction?.voteType == null && updatedVoteType != null) {
             userRepository.awardValidation(actorId)
         }
 

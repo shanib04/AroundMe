@@ -132,6 +132,10 @@ class EventDetailsFragment : Fragment() {
             renderPublisher(user)
         }
 
+        viewModel.selectedVoteType.observe(viewLifecycleOwner) { voteType ->
+            renderVoteSelection(voteType)
+        }
+
         viewModel.myRating.observe(viewLifecycleOwner) { my ->
             suppressRatingListener = true
             binding.ratingBar.rating = (my ?: 0).toFloat()
@@ -209,25 +213,49 @@ class EventDetailsFragment : Fragment() {
     private fun renderPublisher(user: User?) {
         binding.publisherName.text = user?.displayName?.ifBlank { user.username } ?: getString(R.string.profile_not_available)
         binding.publisherHandle.text = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
+        binding.publisherHandle.isVisible = !binding.publisherHandle.text.isNullOrBlank()
 
         Glide.with(this)
             .load(user?.profileImageUrl?.ifBlank { null })
-            .placeholder(R.drawable.ic_place_placeholder)
-            .error(R.drawable.ic_place_placeholder)
+            .placeholder(R.drawable.ic_person_placeholder)
+            .error(R.drawable.ic_person_placeholder)
             .centerCrop()
             .into(binding.publisherAvatar)
+    }
 
-        // Achievements (dynamic, no hardcoding)
-        binding.achievementsChipGroup.removeAllViews()
-        val achievements = user?.achievements.orEmpty().map { it.trim() }.filter { it.isNotBlank() }
-        if (achievements.isEmpty()) {
-            binding.achievementsChipGroup.visibility = View.GONE
-        } else {
-            binding.achievementsChipGroup.visibility = View.VISIBLE
-            achievements.forEach { title ->
-                binding.achievementsChipGroup.addView(AchievementChipBuilder.create(requireContext(), title))
-            }
+    private fun renderVoteSelection(selectedVoteType: EventVoteType?) {
+        val neutralBg = requireContext().getColor(R.color.ds_surface_container_high)
+        val neutralText = requireContext().getColor(R.color.ds_on_surface_variant)
+        val neutralStroke = requireContext().getColor(R.color.ds_surface_container_high)
+
+        val activeBg = requireContext().getColor(R.color.event_positive)
+        val activeText = requireContext().getColor(R.color.white)
+        val activeStroke = activeBg
+
+        val inactiveBg = requireContext().getColor(R.color.event_negative)
+        val inactiveText = requireContext().getColor(R.color.white)
+        val inactiveStroke = inactiveBg
+
+        fun style(button: com.google.android.material.button.MaterialButton, selected: Boolean, bg: Int, text: Int, stroke: Int) {
+            button.setBackgroundColor(if (selected) bg else neutralBg)
+            button.setTextColor(if (selected) text else neutralText)
+            button.strokeColor = android.content.res.ColorStateList.valueOf(if (selected) stroke else neutralStroke)
         }
+
+        style(
+            button = binding.stillHappeningButton,
+            selected = selectedVoteType == EventVoteType.ACTIVE,
+            bg = activeBg,
+            text = activeText,
+            stroke = activeStroke
+        )
+        style(
+            button = binding.endedButton,
+            selected = selectedVoteType == EventVoteType.INACTIVE,
+            bg = inactiveBg,
+            text = inactiveText,
+            stroke = inactiveStroke
+        )
     }
 
     private fun renderSelectedEssentials(type: EventDetailsViewModel.EssentialsType) {

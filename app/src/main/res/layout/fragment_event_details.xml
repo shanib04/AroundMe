@@ -220,27 +220,29 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="16dp">
+                        android:padding="18dp">
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/publisherAvatar"
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
+                            android:layout_width="60dp"
+                            android:layout_height="60dp"
                             android:scaleType="centerCrop"
                             app:layout_constraintStart_toStartOf="parent"
+                            app:layout_constraintBottom_toBottomOf="parent"
                             app:layout_constraintTop_toTopOf="parent"
                             app:shapeAppearanceOverlay="@style/CircleImageView"
+                            android:src="@drawable/ic_person_placeholder"
                             tools:src="@tools:sample/avatars" />
 
                         <TextView
                             android:id="@+id/publisherName"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
+                            android:layout_marginStart="14dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/ds_on_surface"
-                            android:textSize="14sp"
+                            android:textSize="19sp"
                             android:textStyle="bold"
                             app:layout_constraintStart_toEndOf="@id/publisherAvatar"
                             app:layout_constraintTop_toTopOf="@id/publisherAvatar"
@@ -251,28 +253,18 @@
                             android:id="@+id/publisherHandle"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_marginTop="2dp"
+                            android:layout_marginStart="14dp"
+                            android:layout_marginTop="4dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/ds_on_surface_variant"
-                            android:textSize="12sp"
+                            android:textSize="14sp"
+                            app:layout_goneMarginTop="0dp"
                             app:layout_constraintStart_toEndOf="@id/publisherAvatar"
                             app:layout_constraintTop_toBottomOf="@id/publisherName"
                             app:layout_constraintEnd_toEndOf="parent"
+                            app:layout_constraintBottom_toBottomOf="@id/publisherAvatar"
                             tools:text="@alex_r" />
-
-                        <com.google.android.material.chip.ChipGroup
-                            android:id="@+id/achievementsChipGroup"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="12dp"
-                            android:visibility="gone"
-                            app:chipSpacingHorizontal="8dp"
-                            app:chipSpacingVertical="8dp"
-                            app:layout_constraintStart_toStartOf="parent"
-                            app:layout_constraintEnd_toEndOf="parent"
-                            app:layout_constraintTop_toBottomOf="@id/publisherAvatar" />
 
                     </androidx.constraintlayout.widget.ConstraintLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -422,9 +414,10 @@
                                 android:text="Still Happening!"
                                 android:textAllCaps="false"
                                 android:textStyle="bold"
-                                android:textColor="@color/ds_secondary"
+                                android:textColor="@color/ds_on_surface_variant"
+                                app:backgroundTint="@color/ds_surface_container_high"
                                 app:cornerRadius="20dp"
-                                app:strokeColor="#3300666A"
+                                app:strokeColor="@color/ds_surface_container_high"
                                 app:strokeWidth="2dp" />
 
                             <com.google.android.material.button.MaterialButton
@@ -438,8 +431,9 @@
                                 android:textAllCaps="false"
                                 android:textStyle="bold"
                                 android:textColor="@color/ds_on_surface_variant"
+                                app:backgroundTint="@color/ds_surface_container_high"
                                 app:cornerRadius="20dp"
-                                app:strokeColor="#14B02500"
+                                app:strokeColor="@color/ds_surface_container_high"
                                 app:strokeWidth="2dp" />
                         </LinearLayout>
 

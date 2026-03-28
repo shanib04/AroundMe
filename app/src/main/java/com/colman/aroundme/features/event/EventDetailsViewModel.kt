@@ -11,7 +11,6 @@ import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.repository.EventRepository
-import com.colman.aroundme.data.repository.IdentityRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Job
@@ -59,6 +58,9 @@ class EventDetailsViewModel(
     private val _myRating = MutableLiveData<Int?>(null)
     val myRating: LiveData<Int?> = _myRating
 
+    private val _selectedVoteType = MutableLiveData<EventVoteType?>(null)
+    val selectedVoteType: LiveData<EventVoteType?> = _selectedVoteType
+
     private val _isSubmittingRating = MutableLiveData(false)
     val isSubmittingRating: LiveData<Boolean> = _isSubmittingRating
 
@@ -74,6 +76,7 @@ class EventDetailsViewModel(
         viewModelScope.launch {
             eventRepository.observeInteraction(eventId).collectLatest { interaction ->
                 _myRating.value = interaction?.rating?.takeIf { it > 0 }
+                _selectedVoteType.value = interaction?.voteType
             }
         }
     }
