@@ -25,6 +25,10 @@ class AuthRepository(
 
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
 
+    fun logout() {
+        firebaseAuth.signOut()
+    }
+
     suspend fun loginWithEmailAndPassword(
         email: String,
         password: String

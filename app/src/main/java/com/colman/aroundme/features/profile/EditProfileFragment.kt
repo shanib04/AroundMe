@@ -209,8 +209,14 @@ class EditProfileFragment : Fragment() {
                     val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
                     viewModel.deleteProfile(currentId) { ok, err ->
                         if (ok) {
-                            // navigate to login
-                            findNavController().navigate(R.id.loginFragment)
+                            findNavController().navigate(
+                                R.id.loginFragment,
+                                null,
+                                androidx.navigation.NavOptions.Builder()
+                                    .setLaunchSingleTop(true)
+                                    .setPopUpTo(R.id.loginFragment, true)
+                                    .build()
+                            )
                         } else {
                             androidx.appcompat.app.AlertDialog.Builder(requireContext())
                                 .setTitle("Error")

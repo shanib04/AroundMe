@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -103,6 +104,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
     private var radiusSaveJob: Job? = null
     private var statsComputationJob: Job? = null
+
+    private val _logoutState = MutableLiveData<LogoutState>(LogoutState.Idle)
+    val logoutState: LiveData<LogoutState> = _logoutState
+
+    sealed interface LogoutState {
+        data object Idle : LogoutState
+        data object Loading : LogoutState
+        data object Success : LogoutState
+        data class Error(val message: String) : LogoutState
+    }
 
     fun loadCurrentUser() {
         val authUser = authRepo.getCurrentUser()
@@ -263,33 +274,44 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun logout(onComplete: (Boolean) -> Unit) {
+    fun logout() {
         viewModelScope.launch(Dispatchers.IO) {
+            _logoutState.postValue(LogoutState.Loading)
             try {
-                clearObservers()
-                runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() }
+                clearObserversOnMainThread()
+                authRepo.logout()
                 userRepo.clearAllLocal()
-                onComplete(true)
+                _logoutState.postValue(LogoutState.Success)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "logout failed", e)
-                onComplete(false)
+                _logoutState.postValue(LogoutState.Error(e.localizedMessage ?: "Logout failed"))
             }
         }
+    }
+
+    fun consumeLogoutState() {
+        _logoutState.value = LogoutState.Idle
     }
 
     fun deleteProfile(userId: String, onComplete: (Boolean, String?) -> Unit) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                clearObservers()
+                clearObserversOnMainThread()
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
                 userRepo.deleteUser(userId)
                 runCatching { firebase?.deleteUserAndEvents(userId) }
-                runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() }
+                runCatching { authRepo.logout() }
                 onComplete(true, null)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "deleteProfile failed", e)
                 onComplete(false, e.localizedMessage ?: "Failed to delete profile")
             }
+        }
+    }
+
+    private suspend fun clearObserversOnMainThread() {
+        withContext(Dispatchers.Main.immediate) {
+            clearObservers()
         }
     }
 

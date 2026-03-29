@@ -72,23 +72,7 @@ class ProfileFragment : Fragment() {
                                 .setMessage("Are you sure you want to logout?")
                                 .setNegativeButton("Cancel", null)
                                 .setPositiveButton("Logout") { _, _ ->
-                                    viewModel.logout { ok ->
-                                        if (!isAdded) return@logout
-                                        requireActivity().runOnUiThread {
-                                            if (!isAdded) return@runOnUiThread
-                                            if (ok) {
-                                                findNavController().navigate(
-                                                    R.id.loginFragment,
-                                                    null,
-                                                    NavOptions.Builder()
-                                                        .setPopUpTo(R.id.nav_graph, true)
-                                                        .build()
-                                                )
-                                            } else {
-                                                Snackbar.make(binding.root, "Logout failed", Snackbar.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
+                                    viewModel.logout()
                                 }
                                 .show()
                             true
@@ -121,6 +105,29 @@ class ProfileFragment : Fragment() {
 
     private fun observeViewModel() {
         val profileBinding = _binding ?: return
+
+        viewModel.logoutState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is ProfileViewModel.LogoutState.Idle,
+                is ProfileViewModel.LogoutState.Loading -> Unit
+                is ProfileViewModel.LogoutState.Success -> {
+                    viewModel.consumeLogoutState()
+                    val navController = findNavController()
+                    navController.navigate(
+                        R.id.loginFragment,
+                        null,
+                        NavOptions.Builder()
+                            .setLaunchSingleTop(true)
+                            .setPopUpTo(R.id.loginFragment, true)
+                            .build()
+                    )
+                }
+                is ProfileViewModel.LogoutState.Error -> {
+                    viewModel.consumeLogoutState()
+                    Snackbar.make(profileBinding.root, state.message, Snackbar.LENGTH_LONG).show()
+                }
+            }
+        }
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
             if (uri != null) {

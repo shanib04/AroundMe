@@ -22,6 +22,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
     private val userRepo = UserRepository.getInstance(application)
     private val eventRepo = EventRepository.getInstance(application)
+    private val authRepo = com.colman.aroundme.data.repository.AuthRepository()
     private val firebase by lazy { runCatching { FirebaseModel.getInstance() }.getOrNull() }
 
     private val _email = MutableLiveData("")
@@ -162,7 +163,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
                 userRepo.deleteUser(userId)
                 runCatching { firebase?.deleteUserAndEvents(userId) }
-                runCatching { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() }
+                runCatching { authRepo.logout() }
                 onComplete(true, null)
             } catch (e: Exception) {
                 Log.e("EditProfileVM", "delete failed", e)
