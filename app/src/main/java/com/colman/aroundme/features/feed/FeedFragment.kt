@@ -14,12 +14,10 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
-import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -28,8 +26,6 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class FeedFragment : Fragment() {
@@ -60,7 +56,7 @@ class FeedFragment : Fragment() {
     }
 
     private val eventAdapter by lazy {
-        EventAdapter(::openEventDetails, ::submitVote)
+        EventAdapter(::openEventDetails)
     }
 
     private val feedScrollListener = object : RecyclerView.OnScrollListener() {
@@ -80,9 +76,8 @@ class FeedFragment : Fragment() {
         }
     }
 
-    private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
-    private var userSyncJob: Job? = null
-    private var ensureUsersJob: Job? = null
+    private var lastHandledScrollToTopToken: Long = 0L
+    private var selectedSortOption: FeedSortOption = FeedSortOption.NEWEST
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -99,10 +94,6 @@ class FeedFragment : Fragment() {
         setupRecyclerView()
         setupSortDropdown()
         observeViewModel()
-        userSyncJob?.cancel()
-        userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
-            userRepository.syncFromRemoteNow()
-        }
         requestLocationForDistance()
     }
 
@@ -119,9 +110,10 @@ class FeedFragment : Fragment() {
         val options = FeedSortOption.entries.map { it.label }
         val adapter = ArrayAdapter(requireContext(), R.layout.item_dropdown_option, options)
         binding.sortDropdown.setAdapter(adapter)
-        binding.sortDropdown.setText(FeedSortOption.NEWEST.label, false)
+        binding.sortDropdown.setText(selectedSortOption.label, false)
         binding.sortDropdown.setOnItemClickListener { _, _, position, _ ->
-            viewModel.setSortOption(FeedSortOption.entries[position])
+            selectedSortOption = FeedSortOption.entries[position]
+            viewModel.setSortOption(selectedSortOption)
         }
     }
 
@@ -130,17 +122,6 @@ class FeedFragment : Fragment() {
             // If fragment view is already destroyed, ignore emissions.
             if (_binding == null) return@observe
 
-            ensureUsersJob?.cancel()
-            ensureUsersJob = viewLifecycleOwner.lifecycleScope.launch {
-                // this runs on main; fine, but avoid heavy Remote fetch per emission
-                userRepository.ensureUsersLoaded(state.items.map { it.item.event.publisherId })
-            }
-            state.items.forEach { feedItem ->
-                if (_binding == null) return@forEach
-                if (feedItem.item.hostName == EventTextFormatter.unknownPublisherText() && feedItem.item.event.publisherId.isNotBlank()) {
-                    userRepository.refreshUserFromRemote(feedItem.item.event.publisherId)
-                }
-            }
             render(state)
         }
     }
@@ -148,11 +129,17 @@ class FeedFragment : Fragment() {
     private fun render(state: FeedUiState) {
         if (_binding == null) return
 
-        if (binding.sortDropdown.text?.toString() != state.sortOption.label) {
+        if (selectedSortOption != state.sortOption) {
+            selectedSortOption = state.sortOption
             binding.sortDropdown.setText(state.sortOption.label, false)
         }
 
-        eventAdapter.submitList(state.items)
+        eventAdapter.submitList(state.items) {
+            if (state.scrollToTopToken != 0L && state.scrollToTopToken != lastHandledScrollToTopToken) {
+                lastHandledScrollToTopToken = state.scrollToTopToken
+                binding.feedRecyclerView.scrollToPosition(0)
+            }
+        }
         binding.loadingMoreIndicator.isVisible = state.isLoadingMore && state.items.isNotEmpty()
         binding.emptyText.isVisible = state.items.isEmpty()
         binding.emptyText.text = state.emptyMessage
@@ -226,15 +213,8 @@ class FeedFragment : Fragment() {
         findNavController().navigate(action)
     }
 
-    private fun submitVote(eventId: String, isActiveVote: Boolean) {
-        val voteType = if (isActiveVote) EventVoteType.ACTIVE else EventVoteType.INACTIVE
-        viewModel.submitVote(eventId, voteType)
-    }
-
     override fun onDestroyView() {
         // Cancel jobs first to prevent callbacks trying to access a cleared binding.
-        ensureUsersJob?.cancel()
-        userSyncJob?.cancel()
         locationTokenSource?.cancel()
 
         _binding?.feedRecyclerView?.removeOnScrollListener(feedScrollListener)

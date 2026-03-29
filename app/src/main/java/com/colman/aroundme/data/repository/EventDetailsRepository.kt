@@ -1,5 +1,6 @@
 package com.colman.aroundme.data.repository
 
+import android.app.Application
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.User
@@ -11,7 +12,8 @@ import kotlinx.coroutines.tasks.await
 // Repository dedicated to the Event Details screen (Firestore is the source of truth).
 class EventDetailsRepository(
     private val firestore: FirebaseFirestore,
-    private val firebaseModel: FirebaseModel
+    private val firebaseModel: FirebaseModel,
+    private val achievementRepository: AchievementRepository
 ) {
 
     suspend fun fetchEvent(eventId: String): Event? {
@@ -88,7 +90,11 @@ class EventDetailsRepository(
             }
 
             updatedVote
-        }.await()
+        }.await().also {
+            fetchEvent(eventId)?.let { updatedEvent ->
+                achievementRepository.unlockForPublisherEventState(updatedEvent)
+            }
+        }
     }
 
     // Reads current user's rating for this event (1..5) if exists.
@@ -144,6 +150,10 @@ class EventDetailsRepository(
             )
             tx.update(eventRef, mapOf("averageRating" to newAvg, "ratingCount" to newCount))
         }.await()
+
+        fetchEvent(eventId)?.let { updatedEvent ->
+            achievementRepository.unlockForPublisherEventState(updatedEvent)
+        }
     }
 
     companion object {
@@ -158,7 +168,12 @@ class EventDetailsRepository(
         @Volatile private var INSTANCE: EventDetailsRepository? = null
 
         fun getInstance(): EventDetailsRepository = INSTANCE ?: synchronized(this) {
-            val repo = EventDetailsRepository(FirebaseFirestore.getInstance(), FirebaseModel.getInstance())
+            val application = FirebaseAuth.getInstance().app.applicationContext as Application
+            val repo = EventDetailsRepository(
+                FirebaseFirestore.getInstance(),
+                FirebaseModel.getInstance(),
+                AchievementRepository.getInstance(application)
+            )
             INSTANCE = repo
             repo
         }

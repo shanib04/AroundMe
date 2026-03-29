@@ -7,13 +7,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.launch
-import java.util.Locale
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
@@ -22,10 +20,7 @@ import kotlin.math.sqrt
 private const val DEFAULT_FEED_LOCATION_LABEL = "Kefar Sava"
 
 data class FeedEventItem(
-    val item: EventCardItem,
-    val distanceText: String,
-    val isActiveVoteSelected: Boolean,
-    val isInactiveVoteSelected: Boolean
+    val item: EventCardItem
 )
 
 data class FeedUiState(
@@ -35,12 +30,19 @@ data class FeedUiState(
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
     val emptyMessage: String = "",
-    val userLocationLabel: String = DEFAULT_FEED_LOCATION_LABEL
+    val userLocationLabel: String = DEFAULT_FEED_LOCATION_LABEL,
+    val scrollToTopToken: Long = 0L
 )
 
+enum class FeedSortOption(val label: String) {
+    DISTANCE("Distance"),
+    ENDING_SOON("Ending Soon"),
+    NEWEST("Newest")
+}
+
 class FeedViewModel(
-    private val repository: EventRepository,
-    userRepository: UserRepository
+    repository: EventRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
 
     private val allEvents = repository.observeAll().asLiveData()
@@ -54,9 +56,8 @@ class FeedViewModel(
     private var isLoadingMore = false
     private var userLocation = DEFAULT_USER_LOCATION
     private var userLocationLabel = DEFAULT_FEED_LOCATION_LABEL
-    private var interactionCache: Map<String, EventVoteType?> = emptyMap()
-    private var interactionSyncVersion: Long = 0L
     private var sourceUsersById: Map<String, User> = emptyMap()
+    private var scrollToTopToken: Long = 0L
 
     val uiState: LiveData<FeedUiState> = uiStateSource
 
@@ -64,9 +65,8 @@ class FeedViewModel(
         uiStateSource.value = FeedUiState(emptyMessage = "Pull to refresh to load nearby events.")
         uiStateSource.addSource(allEvents) { events ->
             sourceEvents = events.filterNot { it.isEnded }
-            viewModelScope.launch {
-                syncInteractionCache(sourceEvents)
-            }
+            currentPageSize = currentPageSize.coerceAtMost(sourceEvents.size.coerceAtLeast(PAGE_SIZE))
+            publishState()
         }
         uiStateSource.addSource(allUsers) { users ->
             sourceUsersById = users.associateBy { it.id }
@@ -75,22 +75,10 @@ class FeedViewModel(
     }
 
     fun setSortOption(sortOption: FeedSortOption) {
-        if (currentSortOption == sortOption) return
         currentSortOption = sortOption
         currentPageSize = PAGE_SIZE
+        scrollToTopToken = System.currentTimeMillis()
         publishState()
-    }
-
-    fun refresh() {
-        if (isRefreshing) return
-        viewModelScope.launch {
-            isRefreshing = true
-            publishState()
-            kotlinx.coroutines.delay(500)
-            currentPageSize = PAGE_SIZE
-            isRefreshing = false
-            syncInteractionCache(sourceEvents)
-        }
     }
 
     fun loadMoreEvents() {
@@ -98,77 +86,78 @@ class FeedViewModel(
         val sorted = sortedEvents(sourceEvents, currentSortOption)
         if (currentPageSize >= sorted.size) return
 
-        viewModelScope.launch {
-            isLoadingMore = true
-            publishState()
-            kotlinx.coroutines.delay(450)
-            currentPageSize = (currentPageSize + PAGE_SIZE).coerceAtMost(sorted.size)
-            isLoadingMore = false
-            publishState()
-        }
+        isLoadingMore = true
+        publishState()
+        currentPageSize = (currentPageSize + PAGE_SIZE).coerceAtMost(sorted.size)
+        isLoadingMore = false
+        publishState()
     }
 
     fun updateUserLocation(location: MapCoordinate, label: String = DEFAULT_FEED_LOCATION_LABEL) {
         userLocation = location
         userLocationLabel = label.ifBlank { DEFAULT_FEED_LOCATION_LABEL }
-        publishState()
-    }
-
-    fun submitVote(eventId: String, voteType: EventVoteType) {
-        interactionCache = interactionCache + (eventId to voteType)
-        publishState()
-        viewModelScope.launch {
-            val updated = repository.submitVote(eventId, voteType)
-            // If repository returned an updated event from local cache, update the list immediately.
-            if (updated != null) {
-                sourceEvents = sourceEvents.map { if (it.id == updated.id) updated else it }
-                publishState()
-            }
-            syncInteractionCache(sourceEvents)
+        if (currentSortOption == FeedSortOption.DISTANCE || currentSortOption == FeedSortOption.ENDING_SOON) {
+            currentPageSize = PAGE_SIZE.coerceAtMost(sourceEvents.size.coerceAtLeast(PAGE_SIZE))
         }
-    }
-
-    private suspend fun syncInteractionCache(events: List<Event>) {
-        val syncVersion = ++interactionSyncVersion
-        val updatedSelections = buildMap {
-            events.forEach { event ->
-                put(event.id, repository.getInteraction(event.id)?.voteType)
-            }
-        }
-        if (syncVersion != interactionSyncVersion) return
-        interactionCache = updatedSelections
         publishState()
     }
 
     private fun publishState() {
+        prefetchUsers(sourceEvents)
         val sorted = sortedEvents(sourceEvents, currentSortOption)
-        val visibleItems = sorted.take(currentPageSize).map { it.toFeedEventItem(userLocation) }
+        val visibleCount = currentPageSize.coerceAtMost(sorted.size.coerceAtLeast(PAGE_SIZE))
+        val visibleItems = sorted.take(visibleCount).map { it.toFeedEventItem(userLocation) }
         uiStateSource.value = FeedUiState(
             items = visibleItems,
             sortOption = currentSortOption,
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
-            hasMore = currentPageSize < sorted.size,
+            hasMore = visibleCount < sorted.size,
             emptyMessage = if (sorted.isEmpty()) "No events to show yet." else "",
-            userLocationLabel = userLocationLabel
+            userLocationLabel = userLocationLabel,
+            scrollToTopToken = scrollToTopToken
         )
     }
 
     private fun sortedEvents(events: List<Event>, sortOption: FeedSortOption): List<Event> {
         return when (sortOption) {
-            FeedSortOption.DISTANCE -> events.sortedBy {
-                distanceKm(userLocation, MapCoordinate(it.latitude, it.longitude))
-            }
-            FeedSortOption.ENDING_SOON -> events.sortedWith(
-                compareBy<Event> { endingRank(it) }
-                    .thenBy { endingMinutes(it) }
-                    .thenBy { distanceKm(userLocation, MapCoordinate(it.latitude, it.longitude)) }
+            FeedSortOption.DISTANCE -> events.sortedWith(
+                compareBy<Event> { distanceFromUser(it) }
+                    .thenByDescending { it.publishTime }
+                    .thenByDescending { it.id }
             )
-            FeedSortOption.NEWEST -> events.sortedByDescending { it.publishTime }
+            FeedSortOption.ENDING_SOON -> events.sortedWith(
+                compareBy<Event> { endingSortPriority(it) }
+                    .thenBy { endingMinutes(it) }
+                    .thenByDescending { it.publishTime }
+                    .thenByDescending { it.id }
+            )
+            FeedSortOption.NEWEST -> events.sortedWith(
+                compareByDescending<Event> { it.publishTime }
+                    .thenByDescending { it.lastUpdated }
+                    .thenByDescending { it.id }
+            )
         }
     }
 
-    private fun endingRank(event: Event): Int {
+    private fun Event.toFeedEventItem(userLocation: MapCoordinate): FeedEventItem {
+        val hostUser = sourceUsersById[publisherId]
+        return FeedEventItem(
+            item = EventCardItemMapper.fromEvent(
+                event = this,
+                user = hostUser,
+                distanceLabelText = EventCardItemMapper.distanceLabelText(this, userLocation),
+                statusText = EventTextFormatter.statusText(this),
+                postedText = EventTextFormatter.postedTimeText(publishTime)
+            )
+        )
+    }
+
+    private fun distanceFromUser(event: Event): Double {
+        return distanceKm(userLocation, MapCoordinate(event.latitude, event.longitude))
+    }
+
+    private fun endingSortPriority(event: Event): Int {
         return when {
             event.expirationTime > 0L -> 0
             else -> 1
@@ -181,23 +170,6 @@ class FeedViewModel(
         } else {
             Long.MAX_VALUE
         }
-    }
-
-    private fun Event.toFeedEventItem(userLocation: MapCoordinate): FeedEventItem {
-        val distanceKm = distanceKm(userLocation, MapCoordinate(latitude, longitude))
-        val selectedVote = interactionCache[id]
-        val hostUser = sourceUsersById[publisherId]
-        return FeedEventItem(
-            item = EventCardItemMapper.fromEvent(
-                event = this,
-                user = hostUser,
-                statusText = EventTextFormatter.statusText(this),
-                postedText = EventTextFormatter.postedTimeText(publishTime)
-            ),
-            distanceText = formatDistance(distanceKm),
-            isActiveVoteSelected = selectedVote == EventVoteType.ACTIVE,
-            isInactiveVoteSelected = selectedVote == EventVoteType.INACTIVE
-        )
     }
 
     private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
@@ -213,11 +185,16 @@ class FeedViewModel(
         return earthRadiusKm * c
     }
 
-    private fun formatDistance(distanceKm: Double): String {
-        return if (distanceKm < 1.0) {
-            "${(distanceKm * 1000).toInt()}m"
-        } else {
-            String.format(Locale.US, "%.1fkm", distanceKm)
+    private fun prefetchUsers(events: List<Event>) {
+        val publisherIds = events.map(Event::publisherId)
+        viewModelScope.launch {
+            userRepository.ensureUsersLoaded(publisherIds)
+        }
+        publisherIds.forEach { publisherId ->
+            val user = sourceUsersById[publisherId]
+            if (publisherId.isNotBlank() && (user == null || user.displayName.isBlank())) {
+                userRepository.refreshUserFromRemote(publisherId)
+            }
         }
     }
 

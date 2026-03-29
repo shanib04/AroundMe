@@ -42,7 +42,7 @@ class ProfileFragment : Fragment() {
             Log.e("ProfileFragment", "Failed to inflate profile layout", ex)
             // fallback: inflate a minimal view so we don't crash
             val fallback = inflater.inflate(android.R.layout.simple_list_item_1, container, false)
-            Snackbar.make(fallback, "Could not load profile UI", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(fallback, getString(R.string.profile_ui_load_failed), Snackbar.LENGTH_LONG).show()
             fallback
         }
     }
@@ -68,27 +68,11 @@ class ProfileFragment : Fragment() {
                         }
                         R.id.action_logout -> {
                             MaterialAlertDialogBuilder(requireContext())
-                                .setTitle("Logout")
-                                .setMessage("Are you sure you want to logout?")
-                                .setNegativeButton("Cancel", null)
-                                .setPositiveButton("Logout") { _, _ ->
-                                    viewModel.logout { ok ->
-                                        if (!isAdded) return@logout
-                                        requireActivity().runOnUiThread {
-                                            if (!isAdded) return@runOnUiThread
-                                            if (ok) {
-                                                findNavController().navigate(
-                                                    R.id.loginFragment,
-                                                    null,
-                                                    NavOptions.Builder()
-                                                        .setPopUpTo(R.id.nav_graph, true)
-                                                        .build()
-                                                )
-                                            } else {
-                                                Snackbar.make(binding.root, "Logout failed", Snackbar.LENGTH_LONG).show()
-                                            }
-                                        }
-                                    }
+                                .setTitle(R.string.profile_logout_title)
+                                .setMessage(R.string.profile_logout_message)
+                                .setNegativeButton(R.string.cancel, null)
+                                .setPositiveButton(R.string.logout_label) { _, _ ->
+                                    viewModel.logout()
                                 }
                                 .show()
                             true
@@ -110,17 +94,36 @@ class ProfileFragment : Fragment() {
             }
         } catch (ex: Exception) {
             Log.e("ProfileFragment", "Error initializing profile UI", ex)
-            Snackbar.make(view, "Profile failed to load", Snackbar.LENGTH_LONG).show()
+            Snackbar.make(view, getString(R.string.profile_load_failed), Snackbar.LENGTH_LONG).show()
         }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        viewModel.loadCurrentUser()
     }
 
     private fun observeViewModel() {
         val profileBinding = _binding ?: return
+
+        viewModel.logoutState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is ProfileViewModel.LogoutState.Idle,
+                is ProfileViewModel.LogoutState.Loading -> Unit
+                is ProfileViewModel.LogoutState.Success -> {
+                    viewModel.consumeLogoutState()
+                    if (!isAdded || _binding == null) return@observe
+                    val navController = findNavController()
+                    navController.navigate(
+                        R.id.loginFragment,
+                        null,
+                        NavOptions.Builder()
+                            .setLaunchSingleTop(true)
+                            .setPopUpTo(R.id.loginFragment, true)
+                            .build()
+                    )
+                }
+                is ProfileViewModel.LogoutState.Error -> {
+                    viewModel.consumeLogoutState()
+                    Snackbar.make(profileBinding.root, state.message, Snackbar.LENGTH_LONG).show()
+                }
+            }
+        }
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
             if (uri != null) {
@@ -170,8 +173,8 @@ class ProfileFragment : Fragment() {
             profileBinding.progressRightText.text = txt
         }
 
-        viewModel.achievements.observe(viewLifecycleOwner) { list ->
-            bindAchievementPreview(list.orEmpty())
+        viewModel.achievementHistory.observe(viewLifecycleOwner) { history ->
+            bindAchievementPreview(history.orEmpty().take(3))
         }
 
         viewModel.radiusKm.observe(viewLifecycleOwner) { km ->
@@ -239,11 +242,16 @@ class ProfileFragment : Fragment() {
         return when {
             name.contains("rising") ||
                 name.contains("legend") ||
-                name.contains("fresh face") -> R.drawable.ach_bg_orange
+                name.contains("fresh face") ||
+                name.contains("making waves") -> R.drawable.ach_bg_orange
 
             name.contains("trustworthy") ||
                 name.contains("oracle") ||
-                name.contains("fact checker") -> R.drawable.ach_bg_blue
+                name.contains("fact checker") ||
+                name.contains("truth seeker") -> R.drawable.ach_bg_blue
+
+            name.contains("crowd favorite") ||
+                name.contains("crowd pleaser") -> R.drawable.ach_bg_orange
 
             else -> R.drawable.ach_bg_purple
         }

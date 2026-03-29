@@ -1,9 +1,11 @@
 package com.colman.aroundme.data.repository
 
+import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -12,6 +14,7 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
@@ -22,8 +25,15 @@ class AuthRepository(
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val appContext: Context = FirebaseAuth.getInstance().app.applicationContext
 ) {
+    private val achievementRepository by lazy {
+        AchievementRepository.getInstance(appContext.applicationContext as Application)
+    }
 
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
+
+    fun logout() {
+        firebaseAuth.signOut()
+    }
 
     suspend fun loginWithEmailAndPassword(
         email: String,
@@ -83,7 +93,10 @@ class AuthRepository(
             .set(userDoc)
             .await()
 
-        userDoc
+        achievementRepository.unlockFreshFace(user.uid)
+        userDoc.copy(
+            achievementHistory = userRepositorySnapshot(user.uid)?.achievementHistory ?: emptyList()
+        )
     }
 
     suspend fun loginWithIdentifierAndPassword(
@@ -128,6 +141,15 @@ class AuthRepository(
         ensureGoogleUser(user.reloadAndReturnCurrent())
     }
 
+    suspend fun deleteCurrentUserAccountAndData(firebaseModel: FirebaseModel = FirebaseModel.getInstance()) {
+        val user = firebaseAuth.currentUser ?: error("No signed-in user was found.")
+        val userId = user.uid.trim()
+        if (userId.isBlank()) error("No signed-in user was found.")
+
+        firebaseModel.deleteUserAndEventsStrict(userId)
+        user.delete().await()
+    }
+
     private suspend fun uploadProfileImage(userId: String, imageUri: Uri): String {
         val imageRef = storage.reference.child(ProfileImageStoragePath.forUser(userId))
         imageRef.putFile(imageUri).await()
@@ -164,7 +186,8 @@ class AuthRepository(
                 .document(user.uid)
                 .set(profile)
                 .await()
-            profile
+            achievementRepository.unlockFreshFace(user.uid)
+            userRepositorySnapshot(user.uid) ?: profile
         } catch (exception: FirebaseFirestoreException) {
             if (exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                 buildFallbackUser(user)
@@ -172,6 +195,10 @@ class AuthRepository(
                 throw exception
             }
         }
+    }
+
+    private suspend fun userRepositorySnapshot(userId: String): User? {
+        return UserRepository.getInstance(appContext).getUserById(userId).first()
     }
 
     private suspend fun FirebaseUser.reloadAndReturnCurrent(): FirebaseUser {
@@ -213,6 +240,7 @@ class AuthRepository(
             displayName = primary?.displayName?.ifBlank { fallback.displayName } ?: fallback.displayName,
             profileImageUrl = primary?.profileImageUrl?.ifBlank { fallback.profileImageUrl } ?: fallback.profileImageUrl,
             email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
+            achievementHistory = primary?.achievementHistory ?: fallback.achievementHistory,
             discoveryRadiusKm = primary?.discoveryRadiusKm ?: fallback.discoveryRadiusKm,
             points = primary?.points ?: fallback.points,
             eventsPublishedCount = primary?.eventsPublishedCount ?: fallback.eventsPublishedCount,

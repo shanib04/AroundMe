@@ -82,6 +82,51 @@ class EditProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        viewModel.saveState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is EditProfileViewModel.SaveState.Idle,
+                is EditProfileViewModel.SaveState.Loading -> Unit
+                is EditProfileViewModel.SaveState.Success -> {
+                    viewModel.consumeSaveState()
+                    if (_binding == null) return@observe
+                    Snackbar.make(binding.root, state.message ?: getString(R.string.edit_profile_saved), Snackbar.LENGTH_SHORT).show()
+                }
+                is EditProfileViewModel.SaveState.Error -> {
+                    viewModel.consumeSaveState()
+                    if (_binding == null) return@observe
+                    Snackbar.make(binding.root, getString(R.string.edit_profile_save_failed, state.message), Snackbar.LENGTH_LONG).show()
+                }
+            }
+        }
+
+        viewModel.deleteState.observe(viewLifecycleOwner) { state ->
+            when (state) {
+                is EditProfileViewModel.DeleteState.Idle,
+                is EditProfileViewModel.DeleteState.Loading -> Unit
+                is EditProfileViewModel.DeleteState.Success -> {
+                    viewModel.consumeDeleteState()
+                    if (!isAdded || _binding == null) return@observe
+                    findNavController().navigate(
+                        R.id.loginFragment,
+                        null,
+                        androidx.navigation.NavOptions.Builder()
+                            .setLaunchSingleTop(true)
+                            .setPopUpTo(R.id.loginFragment, true)
+                            .build()
+                    )
+                }
+                is EditProfileViewModel.DeleteState.Error -> {
+                    viewModel.consumeDeleteState()
+                    if (!isAdded) return@observe
+                    androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                        .setTitle(R.string.edit_profile_error_title)
+                        .setMessage(state.message)
+                        .setPositiveButton(R.string.save, null)
+                        .show()
+                }
+            }
+        }
+
         binding.emailEditText.apply {
             isEnabled = false
             isFocusable = false
@@ -93,10 +138,9 @@ class EditProfileFragment : Fragment() {
 
         binding.btnCancel.setOnClickListener { findNavController().popBackStack() }
 
-        val currentUserId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        if (currentUserId.isNotBlank()) {
+        if (viewModel.currentUserId().isNotBlank()) {
             tempImageUri = null
-            viewModel.loadUser(currentUserId)
+            viewModel.loadCurrentUser()
         }
 
         // Username inline validation: regex while typing, remote uniqueness on focus lost
@@ -104,7 +148,7 @@ class EditProfileFragment : Fragment() {
         binding.usernameEditText.addTextChangedListener {
             val txt = it?.toString().orEmpty()
             if (txt.isNotBlank() && !usernamePattern.matches(txt)) {
-                binding.usernameEditText.error = "Lowercase letters, numbers, - or _ (max 15)"
+                binding.usernameEditText.error = getString(R.string.edit_profile_username_invalid_inline)
             } else {
                 binding.usernameEditText.error = null
             }
@@ -114,11 +158,9 @@ class EditProfileFragment : Fragment() {
             if (!hasFocus) {
                 val candidate = binding.usernameEditText.text?.toString().orEmpty()
                 if (candidate.isNotBlank() && usernamePattern.matches(candidate)) {
-                    // perform remote uniqueness check
                     lifecycleScope.launch {
-                        val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                        val taken = viewModel.isUsernameTakenRemote(candidate, currentId)
-                        if (taken) binding.usernameEditText.error = "Username already taken"
+                        val taken = viewModel.isUsernameTakenRemote(candidate, viewModel.currentUserId())
+                        if (taken && _binding != null) binding.usernameEditText.error = getString(R.string.edit_profile_username_already_taken)
                     }
                 }
             }
@@ -173,52 +215,35 @@ class EditProfileFragment : Fragment() {
             val newDisplay = binding.displayNameEditText.text?.toString().orEmpty()
 
             if (newDisplay.isBlank()) {
-                binding.displayNameEditText.error = "Display name required"
+                binding.displayNameEditText.error = getString(R.string.edit_profile_display_name_required)
                 return@setOnClickListener
             }
 
             if (newUsername.isNotBlank() && !usernamePattern.matches(newUsername)) {
-                binding.usernameEditText.error = "Invalid username"
+                binding.usernameEditText.error = getString(R.string.edit_profile_username_invalid)
                 return@setOnClickListener
             }
 
             lifecycleScope.launch {
-                val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                val unique = if (newUsername.isBlank()) true else viewModel.isUsernameUniqueLocal(newUsername, currentId)
+                val unique = if (newUsername.isBlank()) true else viewModel.isUsernameUniqueLocal(newUsername, viewModel.currentUserId())
                 if (!unique) {
-                    binding.usernameEditText.error = "Username taken"
+                    if (_binding != null) binding.usernameEditText.error = getString(R.string.edit_profile_username_taken)
                     return@launch
                 }
 
                 viewModel.setUsername(newUsername)
                 viewModel.setDisplayName(newDisplay)
-                viewModel.saveProfile(currentId, tempImageUri) { ok, err ->
-                    if (ok) Snackbar.make(binding.root, "Saved", Snackbar.LENGTH_SHORT).show()
-                    else Snackbar.make(binding.root, "Save failed: $err", Snackbar.LENGTH_LONG).show()
-                }
+                viewModel.saveProfile(tempImageUri)
             }
         }
 
         binding.deleteButton.setOnClickListener {
-            // confirm deletion
             androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                .setTitle("Delete profile")
-                .setMessage("This will permanently delete your profile and all your events. Are you sure?")
-                .setNegativeButton("Cancel", null)
-                .setPositiveButton("Delete") { _, _ ->
-                    val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-                    viewModel.deleteProfile(currentId) { ok, err ->
-                        if (ok) {
-                            // navigate to login
-                            findNavController().navigate(R.id.loginFragment)
-                        } else {
-                            androidx.appcompat.app.AlertDialog.Builder(requireContext())
-                                .setTitle("Error")
-                                .setMessage(err ?: "Failed to delete profile")
-                                .setPositiveButton("OK", null)
-                                .show()
-                        }
-                    }
+                .setTitle(R.string.edit_profile_delete_title)
+                .setMessage(R.string.edit_profile_delete_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.delete_profile_label) { _, _ ->
+                    viewModel.deleteProfile()
                 }
                 .show()
         }

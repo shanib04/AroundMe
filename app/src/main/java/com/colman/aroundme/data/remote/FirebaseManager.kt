@@ -32,13 +32,13 @@ class FirebaseModel private constructor() {
         return imageUploader.upload(uri, remotePath, progressCallback)
     }
 
-    suspend fun updateEventRatingAggregate(eventId: String, actorId: String, rating: Int): Event? {
+    suspend fun updateEventRatingAggregate(eventId: String, userId: String, rating: Int): Event? {
         val normalizedRating = rating.coerceIn(1, 5)
         val eventRef = firestore.collection(EVENTS_COLLECTION).document(eventId)
         val ratingCollection = eventRef.collection(EVENT_RATINGS_COLLECTION)
-        val ratingRef = ratingCollection.document(actorId)
+        val ratingRef = ratingCollection.document(userId)
 
-        val ratingsByActor = try {
+        val ratingsByUser = try {
             ratingCollection
                 .get()
                 .await()
@@ -50,13 +50,13 @@ class FirebaseModel private constructor() {
         } catch (_: FirebaseFirestoreException) {
             mutableMapOf()
         }
-        ratingsByActor[actorId] = normalizedRating
+        ratingsByUser[userId] = normalizedRating
 
         return firestore.runTransaction { transaction ->
             val eventSnapshot = transaction.get(eventRef)
             val currentEvent = eventSnapshot.toObject(Event::class.java) ?: return@runTransaction null
 
-            val validRatings = ratingsByActor.values.filter { it in 1..5 }
+            val validRatings = ratingsByUser.values.filter { it in 1..5 }
             val updatedEvent = currentEvent.copy(
                 averageRating = if (validRatings.isEmpty()) 0.0 else validRatings.average(),
                 ratingCount = validRatings.size,
@@ -66,7 +66,7 @@ class FirebaseModel private constructor() {
             transaction.set(
                 ratingRef,
                 mapOf(
-                    "actorId" to actorId,
+                    "userId" to userId,
                     "rating" to normalizedRating,
                     "lastUpdated" to updatedEvent.lastUpdated
                 ),
@@ -77,12 +77,12 @@ class FirebaseModel private constructor() {
         }.await()
     }
 
-    suspend fun fetchEventRating(eventId: String, actorId: String): Int? {
+    suspend fun fetchEventRating(eventId: String, userId: String): Int? {
         return try {
             firestore.collection(EVENTS_COLLECTION)
                 .document(eventId)
                 .collection(EVENT_RATINGS_COLLECTION)
-                .document(actorId)
+                .document(userId)
                 .get()
                 .await()
                 .getLong("rating")
@@ -106,6 +106,7 @@ class FirebaseModel private constructor() {
                     "displayName" to user.displayName,
                     "profileImageUrl" to user.profileImageUrl,
                     "email" to user.email,
+                    "achievementHistory" to user.achievementHistory,
                     "discoveryRadiusKm" to user.discoveryRadiusKm,
                     "points" to user.points,
                     "eventsPublishedCount" to user.eventsPublishedCount,
@@ -131,17 +132,31 @@ class FirebaseModel private constructor() {
     }
 
     // Delete a user and all events published by that user from Firestore
+    suspend fun deleteUserAndEventsStrict(userId: String) {
+        firestore.collection(USERS_COLLECTION).document(userId).delete().await()
+        val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
+        for (doc in events.documents) {
+            firestore.collection(EVENTS_COLLECTION).document(doc.id).delete().await()
+        }
+    }
+
     suspend fun deleteUserAndEvents(userId: String) {
         try {
-            // delete user doc
-            firestore.collection(USERS_COLLECTION).document(userId).delete().await()
-            // delete events by querying publisherId
-            val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
-            for (doc in events.documents) {
-                firestore.collection(EVENTS_COLLECTION).document(doc.id).delete().await()
-            }
+            deleteUserAndEventsStrict(userId)
         } catch (_: FirebaseFirestoreException) {
             // ignore permission or network failures in best-effort cleanup
+        }
+    }
+
+    suspend fun fetchAllUsers(): List<User> {
+        return try {
+            firestore.collection(USERS_COLLECTION)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(User::class.java) }
+        } catch (_: FirebaseFirestoreException) {
+            emptyList()
         }
     }
 

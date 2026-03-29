@@ -10,7 +10,7 @@ class IdentityRepository(
 ) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    fun getActorId(): String {
+    fun getUserId(): String {
         val userId = firebaseAuth.currentUser?.uid
         if (!userId.isNullOrBlank()) return userId
 

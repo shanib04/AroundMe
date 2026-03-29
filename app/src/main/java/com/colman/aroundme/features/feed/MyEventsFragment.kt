@@ -7,15 +7,12 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.colman.aroundme.R
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 
 class MyEventsFragment : Fragment() {
 
@@ -36,10 +33,6 @@ class MyEventsFragment : Fragment() {
         )
     }
 
-    private val userRepository by lazy { UserRepository.getInstance(requireContext()) }
-    private var userSyncJob: Job? = null
-    private var ensureUsersJob: Job? = null
-
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -51,16 +44,12 @@ class MyEventsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        userSyncJob?.cancel()
-        userSyncJob = viewLifecycleOwner.lifecycleScope.launch {
-            userRepository.syncFromRemoteNow()
-        }
         binding.feedTitleText.text = getString(R.string.my_events_title)
         binding.feedTitleText.setPadding(
             binding.feedTitleText.paddingLeft,
             binding.feedTitleText.paddingTop,
             binding.feedTitleText.paddingRight,
-            resources.getDimensionPixelSize(R.dimen.my_events_title_bottom_padding)
+            14.dpToPx()
         )
         binding.sortInputLayout.isVisible = false
         binding.loadingMoreIndicator.isVisible = false
@@ -68,20 +57,6 @@ class MyEventsFragment : Fragment() {
         binding.feedRecyclerView.adapter = adapter
 
         viewModel.events.observe(viewLifecycleOwner) { rows ->
-            ensureUsersJob?.cancel()
-            ensureUsersJob = lifecycleScope.launch {
-                userRepository.ensureUsersLoaded(
-                    rows.mapNotNull { row ->
-                        (row as? MyEventRow.EventRow)?.item?.event?.publisherId
-                    }
-                )
-            }
-            rows.forEach { row ->
-                val eventRow = row as? MyEventRow.EventRow ?: return@forEach
-                if (eventRow.item.hostName == EventTextFormatter.unknownPublisherText() && eventRow.item.event.publisherId.isNotBlank()) {
-                    userRepository.refreshUserFromRemote(eventRow.item.event.publisherId)
-                }
-            }
             adapter.submitList(rows)
             binding.emptyText.isVisible = rows.none { it is MyEventRow.EventRow }
             binding.emptyText.text = getString(R.string.my_events_empty)
@@ -104,9 +79,9 @@ class MyEventsFragment : Fragment() {
         findNavController().navigate(R.id.createEventFragment, bundle)
     }
 
+    private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
+
     override fun onDestroyView() {
-        ensureUsersJob?.cancel()
-        userSyncJob?.cancel()
         binding.feedRecyclerView.adapter = null
         _binding = null
         super.onDestroyView()

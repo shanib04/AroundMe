@@ -17,10 +17,13 @@ object EventTextFormatter {
     fun eventHostFallbackText(): String = EVENT_HOST
 
     fun statusText(event: Event): String {
-        return if (event.isEnded) {
-            EVENT_ENDED
-        } else {
-            buildStatusFromExpiration(event.expirationTime)
+        return when {
+            event.isEnded -> EVENT_ENDED
+            event.expirationTime <= 0L -> EVENT_LIVE
+            else -> event.timeRemaining
+                .trim()
+                .takeIf(::isRemainingTimeLabel)
+                ?: buildStatusFromExpiration(event.expirationTime)
         }
     }
 
@@ -58,17 +61,17 @@ object EventTextFormatter {
             .take(maxCount)
     }
 
-    fun detailTagLabels(tags: List<String>): List<String> {
-        return tags.mapNotNull { it.trim().takeIf(String::isNotBlank) }
-    }
-
     private fun buildStatusFromExpiration(expirationTime: Long): String {
-        if (expirationTime <= 0L) return EVENT_LIVE
         val remainingMinutes = ((expirationTime - System.currentTimeMillis()) / 60000L).coerceAtLeast(0L)
         return when {
             remainingMinutes < 60L -> "Ends in ${remainingMinutes}m"
             remainingMinutes < 1440L -> "Ends in ${remainingMinutes / 60L}h"
             else -> "Ends in ${remainingMinutes / 1440L}d"
         }
+    }
+
+    private fun isRemainingTimeLabel(value: String): Boolean {
+        val normalized = value.lowercase(Locale.US)
+        return normalized.startsWith("ends in") || Regex("^\\d+\\s*[mhd]$", RegexOption.IGNORE_CASE).matches(value)
     }
 }

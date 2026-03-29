@@ -1,7 +1,6 @@
 package com.colman.aroundme.data.model
 
 import androidx.room.Entity
-import androidx.room.Ignore
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "users")
@@ -11,13 +10,10 @@ data class User(
     val displayName: String = "",
     val profileImageUrl: String = "",
     val email: String = "",
-    val achievements: List<String> = emptyList(),
+    val achievementHistory: List<Achievement> = emptyList(),
     val discoveryRadiusKm: Int = 15,
     val points: Int = 0,
     val eventsPublishedCount: Int = 0,
     val validationsMadeCount: Int = 0,
     val lastUpdated: Long = System.currentTimeMillis() // For Room Sync
-) {
-    @Ignore
-    var achievementHistory: List<Achievement> = emptyList()
-}
+)

@@ -37,7 +37,7 @@ class AchievementHistoryAdapter : ListAdapter<Achievement, AchievementHistoryAda
             binding.achievementDateText.text = if (item.unlockedAt > 0L) {
                 IsraelTime.formatDate(item.unlockedAt)
             } else {
-                binding.root.context.getString(com.colman.aroundme.R.string.achievement_recently_unlocked)
+                binding.root.context.getString(R.string.achievement_recently_unlocked)
             }
         }
 
@@ -46,11 +46,16 @@ class AchievementHistoryAdapter : ListAdapter<Achievement, AchievementHistoryAda
             return when {
                 name.contains("rising") ||
                     name.contains("legend") ||
-                    name.contains("fresh face") -> R.drawable.ach_bg_orange
+                    name.contains("fresh face") ||
+                    name.contains("making waves") -> R.drawable.ach_bg_orange
 
                 name.contains("trustworthy") ||
                     name.contains("oracle") ||
-                    name.contains("fact checker") -> R.drawable.ach_bg_blue
+                    name.contains("fact checker") ||
+                    name.contains("truth seeker") -> R.drawable.ach_bg_blue
+
+                name.contains("crowd favorite") ||
+                    name.contains("crowd pleaser") -> R.drawable.ach_bg_orange
 
                 else -> R.drawable.ach_bg_purple
             }
