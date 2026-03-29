@@ -1,8 +1,11 @@
 package com.colman.aroundme.data.remote
 
-import android.content.ContentResolver
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.net.Uri
+import androidx.exifinterface.media.ExifInterface
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageException
 import kotlinx.coroutines.tasks.await
@@ -37,21 +40,51 @@ class ImageUploader(
     }
 
     private fun prepareUploadUri(sourceUri: Uri, remotePath: String): Uri {
-        if (sourceUri.scheme == ContentResolver.SCHEME_FILE) {
-            return sourceUri
-        }
-
-        val inputStream = appContext.contentResolver.openInputStream(sourceUri)
-            ?: error("Unable to open the selected image for upload.")
         val fileName = remotePath.substringAfterLast('/').ifBlank { "upload_image.jpg" }
         val localFile = File(appContext.cacheDir, fileName)
-        inputStream.use { input ->
+        appContext.contentResolver.openInputStream(sourceUri).use { inputStream ->
+            requireNotNull(inputStream) { "Unable to open the selected image for upload." }
             FileOutputStream(localFile).use { output ->
-                input.copyTo(output)
+                inputStream.copyTo(output)
                 output.flush()
             }
         }
+        normalizeOrientation(localFile)
         return Uri.fromFile(localFile)
+    }
+
+    private fun normalizeOrientation(imageFile: File) {
+        val exif = ExifInterface(imageFile.absolutePath)
+        val rotation = when (exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+            ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+            ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+            else -> 0f
+        }
+        if (rotation == 0f) return
+
+        val originalBitmap = BitmapFactory.decodeFile(imageFile.absolutePath) ?: return
+        val rotatedBitmap = Bitmap.createBitmap(
+            originalBitmap,
+            0,
+            0,
+            originalBitmap.width,
+            originalBitmap.height,
+            Matrix().apply { postRotate(rotation) },
+            true
+        )
+
+        FileOutputStream(imageFile).use { output ->
+            rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, output)
+            output.flush()
+        }
+        exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+        exif.saveAttributes()
+
+        if (rotatedBitmap != originalBitmap) {
+            originalBitmap.recycle()
+        }
+        rotatedBitmap.recycle()
     }
 }
 

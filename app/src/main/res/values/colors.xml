@@ -84,6 +84,9 @@
     <color name="dropdown_option_text">#22324A</color>
     <color name="dropdown_option_pressed">#FFF0E8</color>
     <color name="dropdown_icon_tint">#FF6B6B</color>
+    <color name="my_events_ended_text_primary">#6C7484</color>
+    <color name="my_events_ended_text_secondary">#99A1B3</color>
+    <color name="my_events_ended_card_stroke">#E4E7EE</color>
 
     <!-- Additional Colors -->
     <color name="ds_primary_10">#1AAA2C32</color>
