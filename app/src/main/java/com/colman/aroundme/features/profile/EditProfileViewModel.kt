@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
+import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
@@ -22,7 +23,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
     private val userRepo = UserRepository.getInstance(application)
     private val eventRepo = EventRepository.getInstance(application)
-    private val authRepo = com.colman.aroundme.data.repository.AuthRepository()
+    private val authRepo = AuthRepository()
     private val firebase by lazy { runCatching { FirebaseModel.getInstance() }.getOrNull() }
 
     private val _email = MutableLiveData("")
@@ -43,11 +44,46 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     private val _uploadProgress = MutableLiveData(0)
     val uploadProgress: LiveData<Int> = _uploadProgress
 
+    private val _saveState = MutableLiveData<SaveState>(SaveState.Idle)
+    val saveState: LiveData<SaveState> = _saveState
+
+    private val _deleteState = MutableLiveData<DeleteState>(DeleteState.Idle)
+    val deleteState: LiveData<DeleteState> = _deleteState
+
     private var loadedUser: User? = null
 
-    fun setEmail(v: String) { _email.value = v }
+    sealed interface SaveState {
+        data object Idle : SaveState
+        data object Loading : SaveState
+        data class Success(val message: String?) : SaveState
+        data class Error(val message: String) : SaveState
+    }
+
+    sealed interface DeleteState {
+        data object Idle : DeleteState
+        data object Loading : DeleteState
+        data object Success : DeleteState
+        data class Error(val message: String) : DeleteState
+    }
+
+    fun currentUserId(): String = authRepo.getCurrentUser()?.uid.orEmpty()
+
+    fun consumeSaveState() {
+        _saveState.value = SaveState.Idle
+    }
+
+    fun consumeDeleteState() {
+        _deleteState.value = DeleteState.Idle
+    }
+
     fun setUsername(v: String) { _username.value = v }
     fun setDisplayName(v: String) { _displayName.value = v }
+
+    fun loadCurrentUser() {
+        val userId = currentUserId()
+        if (userId.isBlank()) return
+        loadUser(userId)
+    }
 
     fun loadUser(userId: String) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -78,9 +114,16 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
         return userRepo.isUsernameTakenRemote(candidate, currentUserId)
     }
 
-    fun saveProfile(userId: String, tempImageUri: Uri?, onComplete: (Boolean, String?) -> Unit) {
+    fun saveProfile(tempImageUri: Uri?) {
+        val userId = currentUserId()
+        if (userId.isBlank()) {
+            _saveState.value = SaveState.Error("No signed-in user")
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             _loading.postValue(true)
+            _saveState.postValue(SaveState.Loading)
             try {
                 val existing = loadedUser
                     ?: runCatching { userRepo.getUserById(userId).first() }.getOrNull()
@@ -115,7 +158,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                     val taken = userRepo.isUsernameTakenRemote(candidate, userId)
                     if (taken) {
                         _loading.postValue(false)
-                        onComplete(false, "Username already taken")
+                        _saveState.postValue(SaveState.Error("Username already taken"))
                         return@launch
                     }
                 }
@@ -129,10 +172,10 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
                 _loading.postValue(false)
                 _uploadProgress.postValue(0)
-                onComplete(true, imageUploadMessage)
+                _saveState.postValue(SaveState.Success(imageUploadMessage))
 
                 runCatching {
-                    val fbUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+                    val fbUser = authRepo.getCurrentUser()
                     fbUser?.let {
                         val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
                             .setDisplayName(updated.displayName)
@@ -152,28 +195,40 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 Log.e("EditProfileVM", "saveProfile failed", e)
                 _loading.postValue(false)
                 _uploadProgress.postValue(0)
-                onComplete(false, e.localizedMessage ?: "Failed to save")
+                _saveState.postValue(SaveState.Error(e.localizedMessage ?: "Failed to save"))
             }
         }
     }
 
-    fun deleteProfile(userId: String, onComplete: (Boolean, String?) -> Unit) {
+    fun deleteProfile() {
+        val userId = currentUserId()
+        if (userId.isBlank()) {
+            _deleteState.value = DeleteState.Error("No signed-in user")
+            return
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
+            _loading.postValue(true)
+            _deleteState.postValue(DeleteState.Loading)
             try {
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
                 userRepo.deleteUser(userId)
+                userRepo.clearAllLocal()
                 runCatching { firebase?.deleteUserAndEvents(userId) }
                 runCatching { authRepo.logout() }
-                onComplete(true, null)
+                loadedUser = null
+                _loading.postValue(false)
+                _deleteState.postValue(DeleteState.Success)
             } catch (e: Exception) {
                 Log.e("EditProfileVM", "delete failed", e)
-                onComplete(false, e.localizedMessage ?: "Failed to delete")
+                _loading.postValue(false)
+                _deleteState.postValue(DeleteState.Error(e.localizedMessage ?: "Failed to delete"))
             }
         }
     }
 
     private fun authFallbackUser(userId: String): User? {
-        val authUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser ?: return null
+        val authUser = authRepo.getCurrentUser() ?: return null
         if (authUser.uid != userId) return null
 
         val fallbackUsername = loadedUser?.username

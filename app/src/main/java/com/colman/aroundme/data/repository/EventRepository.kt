@@ -1,5 +1,6 @@
 package com.colman.aroundme.data.repository
 
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import com.colman.aroundme.data.local.AppLocalDb
@@ -25,7 +26,8 @@ class EventRepository private constructor(
     private val firebase: FirebaseModel,
     private val identityRepository: IdentityRepository,
     private val firestore: FirebaseFirestore,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val achievementRepository: AchievementRepository
 ) {
 
     init {}
@@ -120,6 +122,7 @@ class EventRepository private constructor(
         }
         if (existingEvent == null) {
             userRepository.awardEventCreated(event.publisherId)
+            achievementRepository.unlockForCreatedEvent(event.publisherId)
         }
     }
 
@@ -155,9 +158,9 @@ class EventRepository private constructor(
         )
         eventInteractionDao.upsert(updatedInteraction)
 
-        // Reward first-time validation/vote
         if (existingInteraction?.voteType == null && updatedVoteType != null) {
             userRepository.awardValidation(userId)
+            achievementRepository.unlockForValidation(userId)
         }
 
         return recalculateEventAggregates(currentEvent, pushToRemote = true)
@@ -255,6 +258,7 @@ class EventRepository private constructor(
                 Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
             }
         }
+        achievementRepository.unlockForPublisherEventState(updatedEvent)
         return updatedEvent
     }
 
@@ -281,7 +285,8 @@ class EventRepository private constructor(
                 firebase = FirebaseModel.getInstance(),
                 identityRepository = IdentityRepository(context),
                 firestore = FirebaseFirestore.getInstance(),
-                userRepository = UserRepository.getInstance(context)
+                userRepository = UserRepository.getInstance(context),
+                achievementRepository = AchievementRepository.getInstance(context.applicationContext as Application)
             )
             INSTANCE = repo
             repo

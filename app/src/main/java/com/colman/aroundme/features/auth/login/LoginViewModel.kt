@@ -9,12 +9,15 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.R
 import com.colman.aroundme.data.repository.AuthRepository
+import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.launch
 
 class LoginViewModel(
     application: Application,
     private val authRepository: AuthRepository
 ) : AndroidViewModel(application) {
+
+    private val userRepository = UserRepository.getInstance(application)
 
     private val credentialsRequiredMessage = getString(R.string.error_login_credentials_required)
     private val loginFailedMessage = getString(R.string.error_login_failed)
@@ -34,6 +37,7 @@ class LoginViewModel(
         viewModelScope.launch {
             authRepository.loginWithIdentifierAndPassword(identifier.trim(), password)
                 .onSuccess { user ->
+                    bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
                 .onFailure { throwable ->
@@ -54,6 +58,7 @@ class LoginViewModel(
         viewModelScope.launch {
             authRepository.loginWithGoogle(idToken)
                 .onSuccess { user ->
+                    bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
                 .onFailure { throwable ->
@@ -62,6 +67,16 @@ class LoginViewModel(
                     )
                 }
         }
+    }
+
+    private suspend fun bootstrapSignedInUser(userId: String) {
+        authRepository.getCurrentUserProfile()
+            .onSuccess { profile ->
+                userRepository.upsertUser(profile, pushToRemote = false)
+            }
+            .onFailure {
+                userRepository.refreshUserFromRemote(userId)
+            }
     }
 
     fun resetState() {

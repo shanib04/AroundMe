@@ -106,6 +106,8 @@ class FirebaseModel private constructor() {
                     "displayName" to user.displayName,
                     "profileImageUrl" to user.profileImageUrl,
                     "email" to user.email,
+                    "achievements" to user.achievements,
+                    "achievementHistory" to user.achievementHistory,
                     "discoveryRadiusKm" to user.discoveryRadiusKm,
                     "points" to user.points,
                     "eventsPublishedCount" to user.eventsPublishedCount,
@@ -142,6 +144,18 @@ class FirebaseModel private constructor() {
             }
         } catch (_: FirebaseFirestoreException) {
             // ignore permission or network failures in best-effort cleanup
+        }
+    }
+
+    suspend fun fetchAllUsers(): List<User> {
+        return try {
+            firestore.collection(USERS_COLLECTION)
+                .get()
+                .await()
+                .documents
+                .mapNotNull { it.toObject(User::class.java) }
+        } catch (_: FirebaseFirestoreException) {
+            emptyList()
         }
     }
 

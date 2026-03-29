@@ -1,5 +1,6 @@
 package com.colman.aroundme.data.repository
 
+import android.app.Application
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
@@ -12,6 +13,7 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
@@ -22,6 +24,9 @@ class AuthRepository(
     private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val appContext: Context = FirebaseAuth.getInstance().app.applicationContext
 ) {
+    private val achievementRepository by lazy {
+        AchievementRepository.getInstance(appContext.applicationContext as Application)
+    }
 
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
 
@@ -87,7 +92,10 @@ class AuthRepository(
             .set(userDoc)
             .await()
 
-        userDoc
+        achievementRepository.unlockFreshFace(user.uid)
+        userDoc.copy(
+            achievementHistory = userRepositorySnapshot(user.uid)?.achievementHistory ?: emptyList()
+        )
     }
 
     suspend fun loginWithIdentifierAndPassword(
@@ -168,7 +176,8 @@ class AuthRepository(
                 .document(user.uid)
                 .set(profile)
                 .await()
-            profile
+            achievementRepository.unlockFreshFace(user.uid)
+            userRepositorySnapshot(user.uid) ?: profile
         } catch (exception: FirebaseFirestoreException) {
             if (exception.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) {
                 buildFallbackUser(user)
@@ -176,6 +185,10 @@ class AuthRepository(
                 throw exception
             }
         }
+    }
+
+    private suspend fun userRepositorySnapshot(userId: String): User? {
+        return UserRepository.getInstance(appContext).getUserById(userId).first()
     }
 
     private suspend fun FirebaseUser.reloadAndReturnCurrent(): FirebaseUser {
@@ -217,6 +230,8 @@ class AuthRepository(
             displayName = primary?.displayName?.ifBlank { fallback.displayName } ?: fallback.displayName,
             profileImageUrl = primary?.profileImageUrl?.ifBlank { fallback.profileImageUrl } ?: fallback.profileImageUrl,
             email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
+            achievements = primary?.achievements ?: fallback.achievements,
+            achievementHistory = primary?.achievementHistory ?: fallback.achievementHistory,
             discoveryRadiusKm = primary?.discoveryRadiusKm ?: fallback.discoveryRadiusKm,
             points = primary?.points ?: fallback.points,
             eventsPublishedCount = primary?.eventsPublishedCount ?: fallback.eventsPublishedCount,
