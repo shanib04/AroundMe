@@ -18,23 +18,6 @@ class RegisterViewModel(
     private val authRepository: AuthRepository
 ) : AndroidViewModel(application) {
 
-    private val strings = RegisterStrings(
-        displayNameRequired = getString(R.string.error_display_name_required),
-        displayNameInvalid = getString(R.string.error_display_name_invalid),
-        usernameRequired = getString(R.string.error_username_required),
-        usernameInvalid = getString(R.string.error_username_invalid),
-        emailRequired = getString(R.string.error_email_required),
-        invalidEmail = getString(R.string.invalid_email),
-        passwordRequired = getString(R.string.error_password_required),
-        confirmPasswordRequired = getString(R.string.error_confirm_password_required),
-        passwordTooShort = getString(R.string.error_password_length),
-        passwordMismatch = getString(R.string.error_password_mismatch),
-        profilePictureRequired = getString(R.string.error_profile_picture_required),
-        googleTokenMissing = getString(R.string.google_sign_in_token_missing),
-        googleSignUpFailed = getString(R.string.google_sign_up_failed),
-        googleAccountMissing = getString(R.string.error_google_account_missing)
-    )
-
     private val _registerState = MutableLiveData<RegisterUiState>(RegisterUiState.Idle)
     val registerState: LiveData<RegisterUiState> = _registerState
 
@@ -67,7 +50,7 @@ class RegisterViewModel(
                 _registerState.value = RegisterUiState.Success(profile)
             }.onFailure { throwable ->
                 _registerState.value = RegisterUiState.Error(
-                    throwable.localizedMessage ?: strings.googleSignUpFailed
+                    throwable.localizedMessage ?: getString(R.string.google_sign_up_failed)
                 )
             }
         }
@@ -75,7 +58,7 @@ class RegisterViewModel(
 
     fun registerWithGoogle(idToken: String) {
         if (idToken.isBlank()) {
-            _registerState.value = RegisterUiState.Error(strings.googleTokenMissing)
+            _registerState.value = RegisterUiState.Error(getString(R.string.google_sign_in_token_missing))
             return
         }
 
@@ -84,14 +67,14 @@ class RegisterViewModel(
             authRepository.signInWithGoogleAndSyncProfile(idToken)
                 .onSuccess { profile ->
                     if (profile.email.isBlank()) {
-                        _registerState.value = RegisterUiState.Error(strings.googleAccountMissing)
+                        _registerState.value = RegisterUiState.Error(getString(R.string.error_google_account_missing))
                     } else {
                         _registerState.value = RegisterUiState.Success(profile)
                     }
                 }
                 .onFailure { throwable ->
                     _registerState.value = RegisterUiState.Error(
-                        throwable.localizedMessage ?: strings.googleSignUpFailed
+                        throwable.localizedMessage ?: getString(R.string.google_sign_up_failed)
                     )
                 }
         }
@@ -128,33 +111,33 @@ class RegisterViewModel(
         val displayNameRegex = Regex("^[a-zA-Z0-9_\\- ]{1,20}$")
 
         if (trimmedDisplayName.isBlank()) {
-            displayNameError = strings.displayNameRequired
+            displayNameError = getString(R.string.error_display_name_required)
         } else if (!displayNameRegex.matches(trimmedDisplayName)) {
-            displayNameError = strings.displayNameInvalid
+            displayNameError = getString(R.string.error_display_name_invalid)
         }
 
         if (trimmedUsername.isBlank()) {
-            usernameError = strings.usernameRequired
+            usernameError = getString(R.string.error_username_required)
         } else if (!usernameRegex.matches(trimmedUsername)) {
-            usernameError = strings.usernameInvalid
+            usernameError = getString(R.string.error_username_invalid)
         }
 
         if (trimmedEmail.isBlank()) {
-            emailError = strings.emailRequired
+            emailError = getString(R.string.error_email_required)
         } else if (!Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-            emailError = strings.invalidEmail
+            emailError = getString(R.string.invalid_email)
         }
 
         if (password.isBlank()) {
-            passwordError = strings.passwordRequired
+            passwordError = getString(R.string.error_password_required)
         } else if (password.length < 6) {
-            passwordError = strings.passwordTooShort
+            passwordError = getString(R.string.error_password_length)
         }
 
         if (confirmPassword.isBlank()) {
-            confirmPasswordError = strings.confirmPasswordRequired
+            confirmPasswordError = getString(R.string.error_confirm_password_required)
         } else if (password != confirmPassword) {
-            confirmPasswordError = strings.passwordMismatch
+            confirmPasswordError = getString(R.string.error_password_mismatch)
         }
 
         // Profile image is now optional: no error if null
