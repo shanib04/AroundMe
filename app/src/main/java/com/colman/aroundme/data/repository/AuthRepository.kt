@@ -5,6 +5,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -138,6 +139,15 @@ class AuthRepository(
     suspend fun getCurrentUserProfile(): Result<User> = runCatching {
         val user = firebaseAuth.currentUser ?: error("No signed-in user was found.")
         ensureGoogleUser(user.reloadAndReturnCurrent())
+    }
+
+    suspend fun deleteCurrentUserAccountAndData(firebaseModel: FirebaseModel = FirebaseModel.getInstance()) {
+        val user = firebaseAuth.currentUser ?: error("No signed-in user was found.")
+        val userId = user.uid.trim()
+        if (userId.isBlank()) error("No signed-in user was found.")
+
+        firebaseModel.deleteUserAndEventsStrict(userId)
+        user.delete().await()
     }
 
     private suspend fun uploadProfileImage(userId: String, imageUri: Uri): String {

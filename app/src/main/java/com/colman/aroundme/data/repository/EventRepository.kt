@@ -133,13 +133,7 @@ class EventRepository private constructor(
 
     suspend fun deleteEventsByPublisher(pubId: String, removeRemote: Boolean = true) {
         eventDao.deleteEventsByPublisher(pubId)
-        if (removeRemote) {
-            try {
-                firebase.deleteUserAndEvents(pubId)
-            } catch (_: Exception) {
-                // ignore remote failures
-            }
-        }
+        // Remote deletion is orchestrated by AuthRepository for account deletion flows.
     }
 
     // Voting / Rating

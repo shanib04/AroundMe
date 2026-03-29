@@ -211,11 +211,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
             _loading.postValue(true)
             _deleteState.postValue(DeleteState.Loading)
             try {
-                eventRepo.deleteEventsByPublisher(userId, removeRemote = true)
-                userRepo.deleteUser(userId)
+                authRepo.deleteCurrentUserAccountAndData(firebase ?: FirebaseModel.getInstance())
+                eventRepo.deleteEventsByPublisher(userId, removeRemote = false)
                 userRepo.clearAllLocal()
-                runCatching { firebase?.deleteUserAndEvents(userId) }
-                runCatching { authRepo.logout() }
                 loadedUser = null
                 _loading.postValue(false)
                 _deleteState.postValue(DeleteState.Success)

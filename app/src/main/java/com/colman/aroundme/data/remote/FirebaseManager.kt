@@ -133,15 +133,17 @@ class FirebaseModel private constructor() {
     }
 
     // Delete a user and all events published by that user from Firestore
+    suspend fun deleteUserAndEventsStrict(userId: String) {
+        firestore.collection(USERS_COLLECTION).document(userId).delete().await()
+        val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
+        for (doc in events.documents) {
+            firestore.collection(EVENTS_COLLECTION).document(doc.id).delete().await()
+        }
+    }
+
     suspend fun deleteUserAndEvents(userId: String) {
         try {
-            // delete user doc
-            firestore.collection(USERS_COLLECTION).document(userId).delete().await()
-            // delete events by querying publisherId
-            val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
-            for (doc in events.documents) {
-                firestore.collection(EVENTS_COLLECTION).document(doc.id).delete().await()
-            }
+            deleteUserAndEventsStrict(userId)
         } catch (_: FirebaseFirestoreException) {
             // ignore permission or network failures in best-effort cleanup
         }
