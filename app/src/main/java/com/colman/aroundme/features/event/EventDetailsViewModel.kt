@@ -11,6 +11,7 @@ import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.places.Place
+import com.colman.aroundme.data.repository.EventDetailsRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -23,6 +24,7 @@ import kotlin.math.roundToInt
 class EventDetailsViewModel(
     private val eventId: String,
     private val eventRepository: EventRepository,
+    private val eventDetailsRepository: EventDetailsRepository,
     private val userRepository: UserRepository,
     private val placesRepository: PlacesRepository,
     private val firebaseModel: FirebaseModel
@@ -66,20 +68,20 @@ class EventDetailsViewModel(
     private val _isSubmittingRating = MutableLiveData(false)
     val isSubmittingRating: LiveData<Boolean> = _isSubmittingRating
 
+    private val _errorMessage = MutableLiveData<String?>(null)
+    val errorMessage: LiveData<String?> = _errorMessage
+
     private var eventJob: Job? = null
 
     init {
         observeEventRealtime()
-        observeMyInteraction()
+        refreshMyInteraction()
     }
 
-    private fun observeMyInteraction() {
-        // Keep myRating in sync with local interactions, so it survives navigation.
+    private fun refreshMyInteraction() {
         viewModelScope.launch {
-            eventRepository.observeInteraction(eventId).collectLatest { interaction ->
-                _myRating.value = interaction?.rating?.takeIf { it > 0 }
-                _selectedVoteType.value = interaction?.voteType
-            }
+            _myRating.value = eventDetailsRepository.fetchMyRating(eventId)
+            _selectedVoteType.value = eventDetailsRepository.fetchMyVote(eventId)
         }
     }
 
@@ -106,7 +108,10 @@ class EventDetailsViewModel(
         viewModelScope.launch {
             _isSubmittingVote.value = true
             try {
-                eventRepository.submitVote(eventId, voteType)
+                _selectedVoteType.value = eventDetailsRepository.submitVote(eventId, voteType)
+                refreshMyInteraction()
+            } catch (_: Exception) {
+                _errorMessage.value = "Unable to save your report right now."
             } finally {
                 _isSubmittingVote.value = false
             }
@@ -126,13 +131,20 @@ class EventDetailsViewModel(
         viewModelScope.launch {
             _isSubmittingRating.value = true
             try {
-                eventRepository.submitRating(eventId, normalizedRating)
-                // observeMyInteraction() will update _myRating from DB, but keep it consistent here too.
+                eventDetailsRepository.submitRating(eventId, normalizedRating)
                 _myRating.value = normalizedRating
+                refreshMyInteraction()
+            } catch (_: Exception) {
+                _errorMessage.value = "Unable to save your rating right now."
+                refreshMyInteraction()
             } finally {
                 _isSubmittingRating.value = false
             }
         }
+    }
+
+    fun onErrorMessageShown() {
+        _errorMessage.value = null
     }
 
     fun loadNearby(type: EssentialsType) {
@@ -194,6 +206,7 @@ class EventDetailsViewModel(
     class Factory(
         private val eventId: String,
         private val eventRepository: EventRepository,
+        private val eventDetailsRepository: EventDetailsRepository,
         private val userRepository: UserRepository,
         private val placesRepository: PlacesRepository,
         private val firebaseModel: FirebaseModel
@@ -203,6 +216,7 @@ class EventDetailsViewModel(
             return EventDetailsViewModel(
                 eventId = eventId,
                 eventRepository = eventRepository,
+                eventDetailsRepository = eventDetailsRepository,
                 userRepository = userRepository,
                 placesRepository = placesRepository,
                 firebaseModel = firebaseModel,

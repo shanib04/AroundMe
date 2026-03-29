@@ -10,6 +10,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.Dispatchers
@@ -207,6 +208,6 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     private fun buildProfileImageRemotePath(userId: String): String {
-        return "profile_images/$userId/${System.currentTimeMillis()}.jpg"
+        return ProfileImageStoragePath.forUser(userId)
     }
 }

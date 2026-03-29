@@ -227,6 +227,7 @@ class StaticMapView @JvmOverloads constructor(
             "Music" -> 0xFFFF6B6B.toInt()
             "Art" -> 0xFF8E7CFF.toInt()
             "Beer" -> 0xFFFFC857.toInt()
+            "Gaming" -> 0xFF3B82F6.toInt()
             else -> 0xFF20C997.toInt()
         }
     }

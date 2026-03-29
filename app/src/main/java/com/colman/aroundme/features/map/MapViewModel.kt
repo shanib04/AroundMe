@@ -12,6 +12,7 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.features.feed.EventTextFormatter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.atan2
@@ -32,9 +33,10 @@ class MapViewModel(
 ) : ViewModel() {
 
     private val allEvents = repository.observeAll().asLiveData()
+    private val _timeTick = MutableLiveData(System.currentTimeMillis())
 
-    // Expose a snapshot of all events (unfiltered) for global event search
-    fun allEventsSnapshot(): List<Event> = allEvents.value.orEmpty()
+    // Expose a snapshot of active events for global event search.
+    fun allEventsSnapshot(): List<Event> = activeEvents(allEvents.value.orEmpty())
 
     private val _availableFilters = MediatorLiveData<List<String>>()
     val availableFilters: LiveData<List<String>> = _availableFilters
@@ -76,19 +78,18 @@ class MapViewModel(
 
     init {
         _availableFilters.addSource(allEvents) { events ->
-            _availableFilters.value = events
-                .flatMap { event -> listOf(event.category) + event.tags }
-                .map(String::trim)
-                .filter(String::isNotBlank)
-                .distinct()
-                .sortedBy { it.lowercase() }
+            _availableFilters.value = availableFilterLabels(events)
             updateFilteredState()
+        }
+        _availableFilters.addSource(_timeTick) {
+            _availableFilters.value = availableFilterLabels(allEvents.value.orEmpty())
         }
 
         _filteredEvents.addSource(allEvents) { updateFilteredState() }
         _filteredEvents.addSource(_selectedFilters) { updateFilteredState() }
         _filteredEvents.addSource(_radiusKm) { updateFilteredState() }
         _filteredEvents.addSource(_searchCenter) { updateFilteredState() }
+        _filteredEvents.addSource(_timeTick) { updateFilteredState() }
 
         _selectedEvent.addSource(_filteredEvents) { updateSelectedEvent(it) }
         _selectedEvent.addSource(_selectedEventId) { updateSelectedEvent(_filteredEvents.value.orEmpty()) }
@@ -96,6 +97,13 @@ class MapViewModel(
         viewModelScope.launch {
             // trigger initial sync from remote
             repository.syncFromRemote(0L)
+        }
+
+        viewModelScope.launch {
+            while (true) {
+                delay(EVENT_EXPIRATION_REFRESH_MS)
+                _timeTick.postValue(System.currentTimeMillis())
+            }
         }
     }
 
@@ -123,7 +131,7 @@ class MapViewModel(
     }
 
     private fun updateFilteredState() {
-        val events = allEvents.value.orEmpty()
+        val events = activeEvents(allEvents.value.orEmpty())
         val selectedFilters = _selectedFilters.value.orEmpty().map { it.lowercase() }.toSet()
         val center = _searchCenter.value ?: DEFAULT_SEARCH_CENTER
         val radius = _radiusKm.value ?: DEFAULT_RADIUS_KM
@@ -134,8 +142,23 @@ class MapViewModel(
                 .toSet()
             val matchesFilters = selectedFilters.isEmpty() || selectedFilters.any(eventFilters::contains)
             val withinRadius = distanceKm(center, MapCoordinate(event.latitude, event.longitude)) <= radius
-            matchesFilters && withinRadius && !event.isEnded
+            matchesFilters && withinRadius
         }
+    }
+
+    private fun activeEvents(events: List<Event>): List<Event> {
+        val now = _timeTick.value ?: System.currentTimeMillis()
+        return events.filter { event -> event.expirationTime <= 0L || event.expirationTime > now }
+    }
+
+    private fun availableFilterLabels(events: List<Event>): List<String> {
+        return activeEvents(events)
+            .flatMap { event -> listOf(event.category) + event.tags }
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .filterNot { it.equals("books", ignoreCase = true) }
+            .distinct()
+            .sortedBy { it.lowercase() }
     }
 
     private fun updateSelectedEvent(events: List<Event>) {
@@ -189,5 +212,6 @@ class MapViewModel(
         val DEFAULT_SEARCH_CENTER = KEFAR_SAVA_CENTER
         const val DEFAULT_SEARCH_LABEL = "Kefar Sava"
         const val DEFAULT_RADIUS_KM = 25f
+        private const val EVENT_EXPIRATION_REFRESH_MS = 60_000L
     }
 }

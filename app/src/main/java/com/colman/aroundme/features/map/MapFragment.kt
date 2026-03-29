@@ -31,6 +31,7 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentMapBinding
+import com.colman.aroundme.features.feed.EventTextFormatter
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -46,8 +47,14 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class MapFragment : Fragment() {
+
+    private companion object {
+        const val DEFAULT_MAP_ZOOM = 15f
+        const val USER_LOCATION_ZOOM = 17f
+    }
 
     private var _binding: FragmentMapBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentMapBinding accessed outside of onCreateView/onDestroyView" }
@@ -76,7 +83,7 @@ class MapFragment : Fragment() {
                 enableMyLocation()
             }
             else -> {
-                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, 15f)
+                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, DEFAULT_MAP_ZOOM, animate = false)
                 viewModel.updateSearchArea(MapViewModel.KEFAR_SAVA_CENTER, "Kefar Sava")
             }
         }
@@ -137,7 +144,7 @@ class MapFragment : Fragment() {
             userRepository.refreshUserFromRemote(currentUserId)
             val savedRadius = runCatching {
                 userRepository.getUserById(currentUserId).first()?.discoveryRadiusKm?.toFloat()
-            }.getOrNull() ?: 15f
+                }.getOrNull() ?: DEFAULT_MAP_ZOOM
 
             withContext(Dispatchers.Main) {
                 applySavedRadius(savedRadius)
@@ -164,21 +171,25 @@ class MapFragment : Fragment() {
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
             if (location != null) {
                 val userLocation = MapCoordinate(location.latitude, location.longitude)
-                moveToLocation(userLocation, 15f)
+                moveToLocation(userLocation, USER_LOCATION_ZOOM, animate = false)
                 viewModel.updateSearchArea(userLocation, "Current Location")
             } else {
-                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, 15f)
+                moveToLocation(MapViewModel.KEFAR_SAVA_CENTER, DEFAULT_MAP_ZOOM, animate = false)
                 viewModel.updateSearchArea(MapViewModel.KEFAR_SAVA_CENTER, "Kefar Sava")
             }
         }
     }
 
-    private fun moveToLocation(coordinate: MapCoordinate, zoom: Float) {
-        googleMap?.animateCamera(
-            CameraUpdateFactory.newLatLngZoom(
-                LatLng(coordinate.latitude, coordinate.longitude),
+    private fun moveToLocation(coordinate: MapCoordinate, zoom: Float, animate: Boolean = true) {
+        val cameraUpdate = CameraUpdateFactory.newLatLngZoom(
+            LatLng(coordinate.latitude, coordinate.longitude),
             zoom
-        ))
+        )
+        if (animate) {
+            googleMap?.animateCamera(cameraUpdate)
+        } else {
+            googleMap?.moveCamera(cameraUpdate)
+        }
     }
 
     private fun setupMap() {
@@ -335,7 +346,7 @@ class MapFragment : Fragment() {
                         withContext(Dispatchers.Main) {
                             val adapter = object : ArrayAdapter<String>(
                                 requireContext(),
-                                android.R.layout.simple_dropdown_item_1line,
+                                R.layout.item_dropdown_option,
                                 combined.map { item ->
                                     when (item) {
                                         is SuggestionItem.EventSuggestion -> "${item.displayText}  (event)"
@@ -364,14 +375,14 @@ class MapFragment : Fragment() {
                     val event = item.event
                     val center = MapCoordinate(event.latitude, event.longitude)
                     viewModel.updateSearchArea(center, event.locationName)
-                    moveToLocation(center, 15f)
+                    moveToLocation(center, DEFAULT_MAP_ZOOM)
                     viewModel.selectEvent(event.id)
                     binding.searchAreaButton.visibility = View.GONE
                 }
                 is SuggestionItem.AddressSuggestion -> {
                     val center = MapCoordinate(item.latitude, item.longitude)
                     viewModel.updateSearchArea(center, item.label)
-                    moveToLocation(center, 15f)
+                    moveToLocation(center, DEFAULT_MAP_ZOOM)
                     binding.searchAreaButton.visibility = View.GONE
                 }
             }
@@ -420,7 +431,7 @@ class MapFragment : Fragment() {
             if (matchingEvent != null) {
                 val center = MapCoordinate(matchingEvent.latitude, matchingEvent.longitude)
                 viewModel.updateSearchArea(center, matchingEvent.locationName)
-                moveToLocation(center, 15f)
+                moveToLocation(center, DEFAULT_MAP_ZOOM)
                 viewModel.selectEvent(matchingEvent.id)
                 binding.searchAreaButton.visibility = View.GONE
                 return
@@ -439,7 +450,7 @@ class MapFragment : Fragment() {
                                 center,
                                 address.locality ?: address.featureName ?: query
                             )
-                            moveToLocation(center, 15f)
+                            moveToLocation(center, DEFAULT_MAP_ZOOM)
                             binding.searchAreaButton.visibility = View.GONE
                         }
                     } else {
@@ -478,7 +489,7 @@ class MapFragment : Fragment() {
             val uniqueSuggestions = suggestions.distinct().toTypedArray()
             val adapter = ArrayAdapter(
                 requireContext(),
-                android.R.layout.simple_dropdown_item_1line,
+                R.layout.item_dropdown_option,
                 uniqueSuggestions
             )
             binding.locationEditText.setAdapter(adapter)
@@ -506,6 +517,11 @@ class MapFragment : Fragment() {
                 binding.featuredCard.root.visibility = View.VISIBLE
                 binding.featuredCard.eventTitleText.text = selectedItem.title
                 binding.featuredCard.eventLocationText.text = selectedItem.locationSummary
+                binding.featuredCard.ratingCountText.text = String.format(
+                    Locale.US,
+                    "%.1f",
+                    event.averageRating
+                )
                 binding.featuredCard.eventTimeValue.text = selectedItem.timeText
 
                 Glide.with(this)
@@ -514,8 +530,6 @@ class MapFragment : Fragment() {
                     .into(binding.featuredCard.eventImageView)
 
                 googleMap?.setPadding(0, 0, 0, (150 * density).toInt())
-                val position = LatLng(event.latitude, event.longitude)
-                googleMap?.animateCamera(CameraUpdateFactory.newLatLng(position), 300, null)
             }
         }
     }
@@ -549,7 +563,8 @@ class MapFragment : Fragment() {
             "music" to R.drawable.ic_marker_music,
             "art" to R.drawable.ic_marker_art,
             "beer" to R.drawable.ic_marker_beer,
-            "sport" to R.drawable.ic_marker_sport
+            "sport" to R.drawable.ic_marker_sport,
+            "gaming" to R.drawable.ic_marker_gaming
         )
 
         var primaryCategory = "unknown"

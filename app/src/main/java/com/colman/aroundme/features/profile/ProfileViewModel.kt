@@ -15,6 +15,7 @@ import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -600,7 +601,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         Achievement(name = name, icon = icon, description = description)
 
     private fun buildProfileImageRemotePath(userId: String): String {
-        return "profile_images/$userId/${System.currentTimeMillis()}.jpg"
+        return ProfileImageStoragePath.forUser(userId)
     }
 
     companion object {

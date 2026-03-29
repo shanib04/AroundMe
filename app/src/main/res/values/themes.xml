@@ -7,6 +7,15 @@
 
     <style name="Theme.AroundMe" parent="Base.Theme.AroundMe" />
 
+    <style name="Widget.AroundMe.TextInputLayout.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="boxStrokeColor">@color/create_input_border</item>
+        <item name="hintTextColor">@color/text_light</item>
+        <item name="endIconTint">@color/dropdown_icon_tint</item>
+        <item name="startIconTint">@color/text_light</item>
+    </style>
+
     <style name="ShapeAppearanceOverlay.AroundMe.ProfileAvatar" parent="">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>

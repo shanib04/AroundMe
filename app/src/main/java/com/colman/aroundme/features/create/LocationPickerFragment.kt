@@ -1,5 +1,8 @@
 package com.colman.aroundme.features.create
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -7,8 +10,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
-import android.widget.AutoCompleteTextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
@@ -22,6 +26,8 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import java.util.Locale
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -31,15 +37,33 @@ import kotlinx.coroutines.withContext
 
 class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
+    private companion object {
+        const val DEFAULT_MAP_ZOOM = 15f
+        const val USER_LOCATION_ZOOM = 17f
+        val DEFAULT_LOCATION = LatLng(32.1782, 34.9076)
+    }
+
     private var _binding: FragmentLocationPickerBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentLocationPickerBinding accessed outside of onCreateView/onDestroyView" }
 
     private var googleMap: GoogleMap? = null
     private var selectedLatLng: LatLng? = null
     private var geocoderJob: Job? = null
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+
+    private val locationPermissionRequest = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        when {
+            permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) ||
+            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> enableMyLocation()
+            else -> moveToLocation(DEFAULT_LOCATION, DEFAULT_MAP_ZOOM, animate = false)
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentLocationPickerBinding.inflate(inflater, container, false)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         return binding.root
     }
 
@@ -100,12 +124,11 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
                             withContext(Dispatchers.Main) {
                                 val adapter = ArrayAdapter(
                                     requireContext(),
-                                    android.R.layout.simple_dropdown_item_1line,
+                                    R.layout.item_dropdown_option,
                                     suggestions
                                 )
-                                val autoComplete = binding.etSearch as AutoCompleteTextView
-                                autoComplete.setAdapter(adapter)
-                                autoComplete.showDropDown()
+                                binding.etSearch.setAdapter(adapter)
+                                binding.etSearch.showDropDown()
                             }
                         }
                     } catch (_: Exception) {
@@ -115,14 +138,13 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
             }
         })
 
-        (binding.etSearch as AutoCompleteTextView).setOnItemClickListener { _, _, position, _ ->
-            val adapter = (binding.etSearch as AutoCompleteTextView).adapter as? ArrayAdapter<String>
-                ?: return@setOnItemClickListener
-            val selected = adapter.getItem(position) ?: return@setOnItemClickListener
+        binding.etSearch.setOnItemClickListener { parent, _, position, _ ->
+            val selected = parent.getItemAtPosition(position) as? String ?: return@setOnItemClickListener
             searchLocation(selected)
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun searchLocation(query: String) {
         if (query.isBlank()) return
         
@@ -132,7 +154,7 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
             if (!addresses.isNullOrEmpty()) {
                 val address = addresses[0]
                 val latLng = LatLng(address.latitude, address.longitude)
-                googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
+                moveToLocation(latLng, DEFAULT_MAP_ZOOM)
             } else {
                 Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
             }
@@ -143,10 +165,12 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
 
     override fun onMapReady(map: GoogleMap) {
         googleMap = map
-        
-        // Default to a central location (e.g., Israel) if no location is selected
-        val defaultLocation = LatLng(32.0853, 34.7818)
-        map.moveCamera(CameraUpdateFactory.newLatLngZoom(defaultLocation, 12f))
+
+        map.uiSettings.isZoomControlsEnabled = false
+        map.uiSettings.isCompassEnabled = false
+        map.uiSettings.isMyLocationButtonEnabled = false
+
+        requestInitialLocation()
 
         map.setOnCameraIdleListener {
             val center = map.cameraPosition.target
@@ -155,9 +179,50 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
         }
     }
 
+    private fun requestInitialLocation() {
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ) {
+            enableMyLocation()
+        } else {
+            locationPermissionRequest.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun enableMyLocation() {
+        googleMap?.isMyLocationEnabled = true
+        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+            val target = if (location != null) {
+                LatLng(location.latitude, location.longitude)
+            } else {
+                DEFAULT_LOCATION
+            }
+            val zoom = if (location != null) USER_LOCATION_ZOOM else DEFAULT_MAP_ZOOM
+            moveToLocation(target, zoom, animate = false)
+        }.addOnFailureListener {
+            moveToLocation(DEFAULT_LOCATION, DEFAULT_MAP_ZOOM, animate = false)
+        }
+    }
+
+    private fun moveToLocation(latLng: LatLng, zoom: Float, animate: Boolean = true) {
+        val update = CameraUpdateFactory.newLatLngZoom(latLng, zoom)
+        if (animate) {
+            googleMap?.animateCamera(update)
+        } else {
+            googleMap?.moveCamera(update)
+        }
+    }
+
+    @Suppress("DEPRECATION")
     private fun updateAddress(latLng: LatLng) {
         binding.tvLatLong.text = String.format(Locale.getDefault(), "%.4f, %.4f", latLng.latitude, latLng.longitude)
-        
+
         try {
             val geocoder = Geocoder(requireContext(), Locale.getDefault())
             val addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1)

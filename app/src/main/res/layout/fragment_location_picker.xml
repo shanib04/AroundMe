@@ -37,16 +37,21 @@
                 android:src="@drawable/ic_search_area"
                 app:tint="@color/text_light" />
 
-            <AutoCompleteTextView
+            <com.google.android.material.textfield.MaterialAutoCompleteTextView
                 android:id="@+id/etSearch"
                 android:layout_width="0dp"
                 android:layout_height="56dp"
                 android:layout_weight="1"
                 android:background="@null"
+                android:dropDownVerticalOffset="10dp"
                 android:hint="Search location..."
                 android:imeOptions="actionSearch"
                 android:inputType="text"
                 android:paddingHorizontal="12dp"
+                android:popupBackground="@drawable/bg_dropdown_popup"
+                android:popupElevation="18dp"
+                android:textColor="@color/text_dark"
+                android:textColorHint="@color/text_light"
                 android:textSize="15sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

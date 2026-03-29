@@ -23,6 +23,7 @@ import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
+import com.colman.aroundme.core.time.IsraelTime
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentCreateEventBinding
 import com.firebase.geofire.GeoFireUtils
@@ -30,7 +31,6 @@ import com.firebase.geofire.GeoLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
@@ -48,8 +48,8 @@ class CreateEventFragment : Fragment() {
     private var isEndManuallySelected = false
     private var hasExpirationTime = false
 
-    private val startCalendar = Calendar.getInstance()
-    private val endCalendar = Calendar.getInstance().apply {
+    private val startCalendar = IsraelTime.calendar()
+    private val endCalendar = IsraelTime.calendar().apply {
         timeInMillis = startCalendar.timeInMillis
     }
 
@@ -99,6 +99,7 @@ class CreateEventFragment : Fragment() {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
 
+        applyModeUi()
         setupListeners()
         setupCategories()
         setupTagsAutocomplete()
@@ -130,8 +131,8 @@ class CreateEventFragment : Fragment() {
     }
 
     private fun setupCategories() {
-        val categories = listOf("Music", "Food", "Sport", "Art", "Beer", "Books", "Gaming", "Other")
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, categories)
+        val categories = listOf("Music", "Food", "Sport", "Art", "Beer", "Gaming", "Other")
+        val adapter = ArrayAdapter(requireContext(), R.layout.item_dropdown_option, categories)
         binding.actvCategory.setAdapter(adapter)
     }
 
@@ -234,7 +235,7 @@ class CreateEventFragment : Fragment() {
                 binding.actvCategory.error = "Category is required"
                 return@setOnClickListener
             }
-            if (viewModel.selectedImageUri.value == null) {
+            if (!hasEventImage()) {
                 Toast.makeText(context, "An image is required for the event", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -308,8 +309,8 @@ class CreateEventFragment : Fragment() {
     }
 
     private fun updateDateTimeDisplays() {
-        val dateSdf = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-        val timeSdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val dateSdf = IsraelTime.formatter("MMM dd, yyyy", Locale.getDefault())
+        val timeSdf = IsraelTime.formatter("HH:mm", Locale.getDefault())
 
         binding.btnDate.text = dateSdf.format(startCalendar.time)
         binding.btnTime.text = timeSdf.format(startCalendar.time)
@@ -361,7 +362,7 @@ class CreateEventFragment : Fragment() {
 
     private fun setupTagsAutocomplete() {
          val suggestedTags = listOf("Music", "Food", "Sport", "Art", "Free", "Family", "Nightlife")
-         val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, suggestedTags)
+            val adapter = ArrayAdapter(requireContext(), R.layout.item_dropdown_option, suggestedTags)
          binding.etAddTag.setAdapter(adapter)
     }
 
@@ -395,13 +396,7 @@ class CreateEventFragment : Fragment() {
         }
 
         viewModel.selectedImageUri.observe(viewLifecycleOwner) { uri ->
-            if (uri != null) {
-                binding.placeholderContainer.isVisible = false
-                Glide.with(this).load(uri).centerCrop().into(binding.ivEventImage)
-            } else {
-                binding.placeholderContainer.isVisible = true
-                binding.ivEventImage.setImageDrawable(null)
-            }
+            renderEventImage(uri, viewModel.editingEvent.value?.imageUrl)
         }
 
         viewModel.uiState.observe(viewLifecycleOwner) { state ->
@@ -444,11 +439,41 @@ class CreateEventFragment : Fragment() {
             binding.switchEndTime.isChecked = hasExpirationTime
             binding.groupEndTime.isVisible = hasExpirationTime
             updateDateTimeDisplays()
-            if (currentEvent.imageUrl.isNotBlank() && viewModel.selectedImageUri.value == null) {
-                binding.placeholderContainer.isVisible = false
-                Glide.with(this).load(currentEvent.imageUrl).centerCrop().into(binding.ivEventImage)
-            }
+            renderEventImage(viewModel.selectedImageUri.value, currentEvent.imageUrl)
             binding.btnPublish.text = if (eventMode == "edit") getString(R.string.my_events_edit) else getString(R.string.my_events_recreate)
+        }
+    }
+
+    private fun applyModeUi() {
+        binding.screenTitle.text = when (eventMode) {
+            "edit" -> getString(R.string.my_events_edit)
+            "recreate" -> getString(R.string.my_events_recreate)
+            else -> getString(R.string.create_event_title)
+        }
+
+        if (eventMode == "create") {
+            binding.btnPublish.text = getString(R.string.create_event_title)
+        }
+    }
+
+    private fun hasEventImage(): Boolean {
+        return viewModel.selectedImageUri.value != null || !viewModel.editingEvent.value?.imageUrl.isNullOrBlank()
+    }
+
+    private fun renderEventImage(selectedUri: Uri?, existingImageUrl: String?) {
+        when {
+            selectedUri != null -> {
+                binding.placeholderContainer.isVisible = false
+                Glide.with(this).load(selectedUri).centerCrop().into(binding.ivEventImage)
+            }
+            !existingImageUrl.isNullOrBlank() -> {
+                binding.placeholderContainer.isVisible = false
+                Glide.with(this).load(existingImageUrl).centerCrop().into(binding.ivEventImage)
+            }
+            else -> {
+                binding.placeholderContainer.isVisible = true
+                binding.ivEventImage.setImageDrawable(null)
+            }
         }
     }
 
@@ -469,6 +494,7 @@ class CreateEventFragment : Fragment() {
     }
 
     @SuppressLint("MissingPermission")
+    @Suppress("DEPRECATION")
     private fun getCurrentLocation() {
         binding.tvLocationName.text = "Getting location..."
         fusedLocationClient.lastLocation.addOnSuccessListener { location ->
@@ -481,6 +507,7 @@ class CreateEventFragment : Fragment() {
 
                 try {
                     val geocoder = Geocoder(requireContext(), Locale.getDefault())
+                    @Suppress("DEPRECATION")
                     val addresses = geocoder.getFromLocation(location.latitude, location.longitude, 1)
                     if (!addresses.isNullOrEmpty()) {
                         selectedLocationName = addresses[0].getAddressLine(0) ?: "Fixed Location"

@@ -75,7 +75,7 @@
             <!-- Search input only, no mode chips -->
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/locationInputLayout"
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                style="@style/Widget.AroundMe.TextInputLayout.Dropdown"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:hint="@string/map_location_hint"
@@ -87,13 +87,18 @@
                 app:endIconMode="clear_text"
                 app:startIconDrawable="@drawable/ic_search_area">
 
-                <AutoCompleteTextView
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
                     android:id="@+id/locationEditText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:dropDownVerticalOffset="10dp"
                     android:imeOptions="actionSearch"
                     android:inputType="text"
                     android:maxLines="1"
+                    android:popupBackground="@drawable/bg_dropdown_popup"
+                    android:popupElevation="18dp"
+                    android:textColor="@color/map_text_dark"
+                    android:textColorHint="@color/map_text_light"
                     tools:text="Jerusalem" />
             </com.google.android.material.textfield.TextInputLayout>
 

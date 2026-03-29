@@ -17,12 +17,10 @@ object EventTextFormatter {
     fun eventHostFallbackText(): String = EVENT_HOST
 
     fun statusText(event: Event): String {
-        return event.timeRemaining.ifBlank {
-            if (event.isEnded) {
-                EVENT_ENDED
-            } else {
-                buildStatusFromExpiration(event.expirationTime)
-            }
+        return if (event.isEnded) {
+            EVENT_ENDED
+        } else {
+            buildStatusFromExpiration(event.expirationTime)
         }
     }
 
