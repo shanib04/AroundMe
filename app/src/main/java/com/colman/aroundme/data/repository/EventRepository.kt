@@ -141,14 +141,14 @@ class EventRepository private constructor(
 
     // Voting / Rating
     suspend fun submitVote(eventId: String, voteType: EventVoteType): Event? {
-        val actorId = identityRepository.getActorId()
+        val userId = identityRepository.getUserId()
         val currentEvent = eventDao.getByIdNow(eventId) ?: return null
 
-        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, userId)
         val updatedVoteType = if (existingInteraction?.voteType == voteType) null else voteType
         val updatedInteraction = EventInteraction(
             eventId = eventId,
-            actorId = actorId,
+            userId = userId,
             voteType = updatedVoteType,
             rating = existingInteraction?.rating ?: 0,
             lastUpdated = System.currentTimeMillis()
@@ -157,7 +157,7 @@ class EventRepository private constructor(
 
         // Reward first-time validation/vote
         if (existingInteraction?.voteType == null && updatedVoteType != null) {
-            userRepository.awardValidation(actorId)
+            userRepository.awardValidation(userId)
         }
 
         return recalculateEventAggregates(currentEvent, pushToRemote = true)
@@ -165,13 +165,13 @@ class EventRepository private constructor(
 
     suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {
         val normalizedRating = rating.coerceIn(1, 5)
-        val actorId = identityRepository.getActorId()
+        val userId = identityRepository.getUserId()
         val currentEvent = eventDao.getByIdNow(eventId) ?: return null
 
-        val existingInteraction = eventInteractionDao.getInteraction(eventId, actorId)
+        val existingInteraction = eventInteractionDao.getInteraction(eventId, userId)
         val updatedInteraction = EventInteraction(
             eventId = eventId,
-            actorId = actorId,
+            userId = userId,
             voteType = existingInteraction?.voteType,
             rating = normalizedRating,
             lastUpdated = System.currentTimeMillis()
@@ -182,7 +182,7 @@ class EventRepository private constructor(
 
         // Best-effort remote aggregate update (don’t fail the UX on network)
         val remoteUpdatedEvent = try {
-            firebase.updateEventRatingAggregate(eventId, actorId, normalizedRating)
+            firebase.updateEventRatingAggregate(eventId, userId, normalizedRating)
         } catch (e: Exception) {
             Log.e(TAG, "submitRating remote aggregate sync failed", e)
             null
@@ -196,16 +196,16 @@ class EventRepository private constructor(
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val remote = firebase.fetchEventsSince(since)
-                val actorId = identityRepository.getActorId()
+                val userId = identityRepository.getUserId()
                 for (r in remote) {
                     eventDao.insert(r)
-                    val remoteRating = firebase.fetchEventRating(r.id, actorId)
+                    val remoteRating = firebase.fetchEventRating(r.id, userId)
                     if (remoteRating != null) {
-                        val existingInteraction = eventInteractionDao.getInteraction(r.id, actorId)
+                        val existingInteraction = eventInteractionDao.getInteraction(r.id, userId)
                         eventInteractionDao.upsert(
                             EventInteraction(
                                 eventId = r.id,
-                                actorId = actorId,
+                                userId = userId,
                                 voteType = existingInteraction?.voteType,
                                 rating = remoteRating,
                                 lastUpdated = maxOf(existingInteraction?.lastUpdated ?: 0L, r.lastUpdated)
@@ -219,15 +219,15 @@ class EventRepository private constructor(
         }
     }
 
-    suspend fun getValidationCountForActor(actorId: String): Int {
-        return eventInteractionDao.getValidationCountForActor(actorId)
+    suspend fun getValidationCountForUser(userId: String): Int {
+        return eventInteractionDao.getValidationCountForUser(userId)
     }
 
     fun observeInteraction(eventId: String) =
-        eventInteractionDao.observeInteraction(eventId, identityRepository.getActorId())
+        eventInteractionDao.observeInteraction(eventId, identityRepository.getUserId())
 
     suspend fun getInteraction(eventId: String): EventInteraction? {
-        return eventInteractionDao.getInteraction(eventId, identityRepository.getActorId())
+        return eventInteractionDao.getInteraction(eventId, identityRepository.getUserId())
     }
 
     private suspend fun recalculateEventAggregates(

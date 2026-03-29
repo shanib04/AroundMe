@@ -421,9 +421,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         statsComputationJob?.cancel()
         val requestedUserId = currentUserId
         statsComputationJob = viewModelScope.launch(Dispatchers.IO) {
-            val actorId = authRepo.getCurrentUser()?.uid.orEmpty()
-            val derivedValidations = actorId.takeIf { it.isNotBlank() }
-                ?.let { runCatching { eventRepo.getValidationCountForActor(it) }.getOrDefault(0) }
+            val userId = authRepo.getCurrentUser()?.uid.orEmpty()
+            val derivedValidations = userId.takeIf { it.isNotBlank() }
+                ?.let { runCatching { eventRepo.getValidationCountForUser(it) }.getOrDefault(0) }
                 ?: 0
             val realEventCount = events.size
             val safeUser = (user ?: authFallbackUser()) ?: User(id = requestedUserId)
