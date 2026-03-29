@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.RatingBar
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
@@ -15,15 +16,18 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
+import com.colman.aroundme.core.time.IsraelTime
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
+import com.colman.aroundme.data.repository.EventDetailsRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentEventDetailsBinding
+import java.util.Date
 import java.util.Locale
 
 class EventDetailsFragment : Fragment() {
@@ -38,6 +42,7 @@ class EventDetailsFragment : Fragment() {
         EventDetailsViewModel.Factory(
             eventId = args.eventId,
             eventRepository = EventRepository.getInstance(requireContext()),
+            eventDetailsRepository = EventDetailsRepository.getInstance(),
             userRepository = UserRepository.getInstance(requireContext()),
             placesRepository = PlacesRepository.getInstance(),
             firebaseModel = FirebaseModel.getInstance()
@@ -47,6 +52,12 @@ class EventDetailsFragment : Fragment() {
     private val nearbyAdapter by lazy {
         NearbyEssentialsAdapter(::openPlace)
     }
+
+    private val eventTimePrimaryView: TextView
+        get() = binding.root.findViewById(R.id.eventTimePrimary)
+
+    private val eventTimeSecondaryView: TextView
+        get() = binding.root.findViewById(R.id.eventTimeSecondary)
 
     private var suppressRatingListener = false
 
@@ -172,11 +183,19 @@ class EventDetailsFragment : Fragment() {
             renderSelectedEssentials(type)
             nearbyAdapter.fallbackType = type
         }
+
+        viewModel.errorMessage.observe(viewLifecycleOwner) { message ->
+            if (message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            viewModel.onErrorMessageShown()
+        }
     }
 
     private fun renderEvent(event: Event) {
         binding.eventTitle.text = event.title
         binding.aboutText.text = event.description
+        eventTimePrimaryView.text = primaryTimeText(event)
+        eventTimeSecondaryView.text = secondaryTimeText(event)
 
         // Location text: we don't have subtitle in model, keep a subtle variant line with coordinates
         binding.locationName.text = event.locationName.ifBlank { getString(R.string.event_unknown_location) }
@@ -191,10 +210,10 @@ class EventDetailsFragment : Fragment() {
 
         if (event.ratingCount > 0) {
             binding.ratingValue.text = String.format(Locale.US, "%.1f", event.averageRating)
-            binding.ratingCount.text = "(${event.ratingCount} Reviews)"
+            binding.ratingCount.text = "${event.ratingCount} reviews"
         } else {
             binding.ratingValue.text = "0.0"
-            binding.ratingCount.text = "(0 Reviews)"
+            binding.ratingCount.text = "No reviews yet"
         }
 
         // Tags
@@ -299,5 +318,27 @@ class EventDetailsFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
+    }
+
+    private fun primaryTimeText(event: Event): String {
+        return if (event.isEnded) {
+            "Ended"
+        } else if (event.expirationTime > 0L) {
+            "Ends ${formatEventDateTime(event.expirationTime)}"
+        } else {
+            "Live now"
+        }
+    }
+
+    private fun secondaryTimeText(event: Event): String {
+        return if (event.publishTime > 0L) {
+            "Posted ${formatEventDateTime(event.publishTime)}"
+        } else {
+            "Start time not available"
+        }
+    }
+
+    private fun formatEventDateTime(timestamp: Long): String {
+        return IsraelTime.formatDateTime(timestamp, locale = Locale.getDefault())
     }
 }

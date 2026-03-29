@@ -76,8 +76,10 @@
     <string name="my_events_empty">You haven’t created any events yet.</string>
     <string name="my_events_edit">Edit Event</string>
     <string name="my_events_recreate">Recreate Event</string>
+    <string name="create_event_title">Create Event</string>
     <string name="event_unknown_location">Unknown location</string>
     <string name="map_showing_events_around_format">Showing events around %1$s</string>
+    <string name="map_event_status_label">STATUS</string>
     <string name="username_label">Username</string>
     <string name="profile_points_summary_default">0 total points</string>
     <string name="profile_completion_default">0%% complete</string>

@@ -150,59 +150,173 @@
                             android:textStyle="bold"
                             tools:text="Night Market &amp; Street Food" />
 
-                        <LinearLayout
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/timeCard"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="10dp"
-                            android:baselineAligned="false"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal">
+                            android:layout_marginTop="14dp"
+                            app:cardBackgroundColor="@color/ds_surface_lowest"
+                            app:cardCornerRadius="22dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="@color/ds_secondary_10"
+                            app:strokeWidth="1dp">
 
-                            <RatingBar
-                                android:id="@+id/ratingBar"
-                                style="?android:attr/ratingBarStyleSmall"
-                                android:layout_width="wrap_content"
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:isIndicator="false"
-                                android:numStars="5"
-                                android:rating="0"
-                                android:stepSize="0.5"
-                                android:progressTint="#FFD700" />
+                                android:gravity="center_vertical"
+                                android:orientation="horizontal"
+                                android:paddingHorizontal="14dp"
+                                android:paddingVertical="12dp">
 
-                            <TextView
-                                android:id="@+id/ratingValue"
-                                android:layout_width="wrap_content"
+                                <FrameLayout
+                                    android:layout_width="38dp"
+                                    android:layout_height="38dp"
+                                    android:background="@drawable/bg_icon_circle_teal">
+
+                                    <ImageView
+                                        android:layout_width="20dp"
+                                        android:layout_height="20dp"
+                                        android:layout_gravity="center"
+                                        android:contentDescription="@null"
+                                        android:src="@drawable/ic_calendar"
+                                        app:tint="@color/ds_secondary" />
+                                </FrameLayout>
+
+                                <LinearLayout
+                                    android:layout_width="0dp"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="12dp"
+                                    android:layout_weight="1"
+                                    android:orientation="vertical">
+
+                                    <TextView
+                                        android:id="@+id/eventTimePrimary"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:background="@drawable/bg_event_status_pill"
+                                        android:paddingHorizontal="10dp"
+                                        android:paddingVertical="4dp"
+                                        android:textColor="@color/ds_secondary"
+                                        android:textSize="14sp"
+                                        android:textStyle="bold"
+                                        tools:text="Live now" />
+
+                                    <TextView
+                                        android:id="@+id/eventTimeSecondary"
+                                        android:layout_width="match_parent"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginTop="2dp"
+                                        android:textColor="@color/ds_on_surface_variant"
+                                        android:textSize="13sp"
+                                        tools:text="Posted Sun, Mar 29 at 7:00 PM" />
+                                </LinearLayout>
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:id="@+id/ratingCard"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            app:cardBackgroundColor="@color/ds_surface_lowest"
+                            app:cardCornerRadius="22dp"
+                            app:cardElevation="0dp"
+                            app:strokeColor="@color/ds_secondary_10"
+                            app:strokeWidth="1dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:textColor="@color/ds_on_surface"
-                                android:textSize="14sp"
-                                android:textStyle="bold"
-                                tools:text="4.5" />
+                                android:baselineAligned="false"
+                                android:clipChildren="false"
+                                android:clipToPadding="false"
+                                android:gravity="center_vertical"
+                                android:minHeight="64dp"
+                                android:orientation="horizontal"
+                                android:paddingStart="14dp"
+                                android:paddingTop="12dp"
+                                android:paddingEnd="14dp"
+                                android:paddingBottom="12dp">
 
-                            <TextView
-                                android:id="@+id/ratingCount"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginStart="10dp"
-                                android:textColor="@color/ds_on_surface_variant"
-                                android:textSize="12sp"
-                                tools:text="(128 Reviews)" />
+                                <FrameLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center_vertical"
+                                    android:clipChildren="false"
+                                    android:clipToPadding="false"
+                                    android:paddingStart="10dp"
+                                    android:paddingEnd="4dp"
+                                    android:paddingTop="2dp"
+                                    android:paddingBottom="2dp">
 
-                            <View
-                                android:layout_width="0dp"
-                                android:layout_height="0dp"
-                                android:layout_weight="1" />
+                                    <RatingBar
+                                        android:id="@+id/ratingBar"
+                                        style="?android:attr/ratingBarStyleSmall"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:isIndicator="false"
+                                        android:numStars="5"
+                                        android:rating="0"
+                                        android:stepSize="0.5"
+                                        android:progressTint="#FFD700"
+                                        android:scaleX="1.16"
+                                        android:scaleY="1.16"
+                                        android:transformPivotX="0dp"
+                                        android:transformPivotY="0dp" />
+                                </FrameLayout>
 
-                            <TextView
-                                android:id="@+id/rateHint"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Tap to rate"
-                                android:textColor="@color/ds_secondary"
-                                android:textSize="12sp"
-                                android:textStyle="bold" />
+                                <LinearLayout
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="16dp"
+                                    android:layout_gravity="center_vertical"
+                                    android:baselineAligned="false"
+                                    android:gravity="center_vertical"
+                                    android:orientation="horizontal"
+                                    android:translationY="1dp">
 
-                        </LinearLayout>
+                                    <TextView
+                                        android:id="@+id/ratingValue"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:includeFontPadding="false"
+                                        android:textColor="@color/ds_on_surface"
+                                        android:textSize="20sp"
+                                        android:textStyle="bold"
+                                        tools:text="4.5" />
+
+                                    <TextView
+                                        android:id="@+id/ratingCount"
+                                        android:layout_width="wrap_content"
+                                        android:layout_height="wrap_content"
+                                        android:layout_marginStart="8dp"
+                                        android:includeFontPadding="false"
+                                        android:textColor="@color/ds_on_surface_variant"
+                                        android:textSize="12sp"
+                                        tools:text="128 reviews" />
+                                </LinearLayout>
+
+                                <View
+                                    android:layout_width="0dp"
+                                    android:layout_height="0dp"
+                                    android:layout_weight="1" />
+
+                                <TextView
+                                    android:id="@+id/rateHint"
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginStart="12dp"
+                                    android:background="@drawable/bg_event_status_pill"
+                                    android:paddingHorizontal="10dp"
+                                    android:paddingVertical="6dp"
+                                    android:text="Tap to rate"
+                                    android:textColor="@color/ds_secondary"
+                                    android:textSize="12sp"
+                                    android:textStyle="bold" />
+
+                            </LinearLayout>
+                        </com.google.android.material.card.MaterialCardView>
 
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
@@ -212,7 +326,7 @@
                     android:id="@+id/publisherCard"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="12dp"
                     app:cardBackgroundColor="@color/ds_surface_lowest"
                     app:cardCornerRadius="32dp"
                     app:cardElevation="0dp">
@@ -220,12 +334,12 @@
                     <androidx.constraintlayout.widget.ConstraintLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:padding="18dp">
+                        android:padding="16dp">
 
                         <com.google.android.material.imageview.ShapeableImageView
                             android:id="@+id/publisherAvatar"
-                            android:layout_width="60dp"
-                            android:layout_height="60dp"
+                            android:layout_width="42dp"
+                            android:layout_height="42dp"
                             android:scaleType="centerCrop"
                             app:layout_constraintStart_toStartOf="parent"
                             app:layout_constraintBottom_toBottomOf="parent"
@@ -238,11 +352,11 @@
                             android:id="@+id/publisherName"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="14dp"
+                            android:layout_marginStart="10dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/ds_on_surface"
-                            android:textSize="19sp"
+                            android:textSize="16sp"
                             android:textStyle="bold"
                             app:layout_constraintStart_toEndOf="@id/publisherAvatar"
                             app:layout_constraintTop_toTopOf="@id/publisherAvatar"
@@ -253,12 +367,12 @@
                             android:id="@+id/publisherHandle"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="14dp"
-                            android:layout_marginTop="4dp"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginTop="2dp"
                             android:ellipsize="end"
                             android:maxLines="1"
                             android:textColor="@color/ds_on_surface_variant"
-                            android:textSize="14sp"
+                            android:textSize="12sp"
                             app:layout_goneMarginTop="0dp"
                             app:layout_constraintStart_toEndOf="@id/publisherAvatar"
                             app:layout_constraintTop_toBottomOf="@id/publisherName"

@@ -32,6 +32,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/screenTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
@@ -207,7 +208,7 @@
                 android:textStyle="bold" />
 
             <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                style="@style/Widget.AroundMe.TextInputLayout.Dropdown"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
@@ -219,14 +220,18 @@
                 app:boxStrokeColor="@color/create_input_border"
                 app:hintEnabled="false">
 
-                <AutoCompleteTextView
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
                     android:id="@+id/actvCategory"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:dropDownVerticalOffset="10dp"
                     android:hint="Select category"
                     android:inputType="none"
                     android:paddingVertical="16dp"
+                    android:popupBackground="@drawable/bg_dropdown_popup"
+                    android:popupElevation="18dp"
                     android:textColor="@color/create_input_text"
+                    android:textColorHint="@color/create_input_hint"
                     android:textSize="15sp" />
             </com.google.android.material.textfield.TextInputLayout>
 
@@ -397,15 +402,18 @@
                     app:boxStrokeWidthFocused="2dp"
                     app:hintEnabled="false">
 
-                    <AutoCompleteTextView
+                    <com.google.android.material.textfield.MaterialAutoCompleteTextView
                         android:id="@+id/etAddTag"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:dropDownVerticalOffset="10dp"
                         android:hint="Add a tag... (e.g. Food, Music)"
                         android:imeOptions="actionDone"
                         android:inputType="text"
                         android:paddingVertical="14dp"
                         android:paddingStart="16dp"
+                        android:popupBackground="@drawable/bg_dropdown_popup"
+                        android:popupElevation="18dp"
                         android:textColor="@color/create_input_text"
                         android:textColorHint="@color/create_input_hint"
                         android:textSize="14sp"

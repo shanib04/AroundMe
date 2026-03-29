@@ -18,6 +18,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.colman.aroundme.R
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
@@ -116,7 +117,7 @@ class FeedFragment : Fragment() {
 
     private fun setupSortDropdown() {
         val options = FeedSortOption.entries.map { it.label }
-        val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, options)
+        val adapter = ArrayAdapter(requireContext(), R.layout.item_dropdown_option, options)
         binding.sortDropdown.setAdapter(adapter)
         binding.sortDropdown.setText(FeedSortOption.NEWEST.label, false)
         binding.sortDropdown.setOnItemClickListener { _, _, position, _ ->

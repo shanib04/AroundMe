@@ -6,10 +6,9 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
+import com.colman.aroundme.core.time.IsraelTime
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.ItemAchievementHistoryBinding
-import java.text.DateFormat
-import java.util.Date
 
 class AchievementHistoryAdapter : ListAdapter<Achievement, AchievementHistoryAdapter.HistoryViewHolder>(DiffCallback) {
 
@@ -36,7 +35,7 @@ class AchievementHistoryAdapter : ListAdapter<Achievement, AchievementHistoryAda
             binding.achievementNameText.text = item.name
             binding.achievementDescriptionText.text = item.description
             binding.achievementDateText.text = if (item.unlockedAt > 0L) {
-                DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(item.unlockedAt))
+                IsraelTime.formatDate(item.unlockedAt)
             } else {
                 binding.root.context.getString(com.colman.aroundme.R.string.achievement_recently_unlocked)
             }

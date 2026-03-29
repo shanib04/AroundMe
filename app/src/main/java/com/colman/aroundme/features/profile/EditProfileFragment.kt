@@ -12,16 +12,16 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
+import androidx.core.widget.addTextChangedListener
+import androidx.navigation.fragment.findNavController
+import com.colman.aroundme.R
+import com.colman.aroundme.core.time.IsraelTime
 import com.bumptech.glide.Glide
 import com.colman.aroundme.databinding.FragmentEditProfileBinding
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import java.io.File
-import java.text.SimpleDateFormat
 import java.util.Locale
-import androidx.core.widget.addTextChangedListener
-import androidx.navigation.fragment.findNavController
-import com.colman.aroundme.R
 
 class EditProfileFragment : Fragment() {
 
@@ -62,7 +62,7 @@ class EditProfileFragment : Fragment() {
     }
 
     private fun createImageFileUri(): Uri? {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(System.currentTimeMillis())
+        val timestamp = IsraelTime.formatter("yyyyMMdd_HHmmss", Locale.US).format(System.currentTimeMillis())
         val fileName = "IMG_${timestamp}.jpg"
         val file = File(requireContext().cacheDir, fileName)
         // ensure file exists
@@ -100,10 +100,10 @@ class EditProfileFragment : Fragment() {
         }
 
         // Username inline validation: regex while typing, remote uniqueness on focus lost
-        val usernameRegex = "^[a-z0-9_-]{1,15}$".toRegex()
+        val usernamePattern = "^[a-z0-9_-]{1,15}$".toRegex()
         binding.usernameEditText.addTextChangedListener {
             val txt = it?.toString().orEmpty()
-            if (txt.isNotBlank() && !usernameRegex.matches(txt)) {
+            if (txt.isNotBlank() && !usernamePattern.matches(txt)) {
                 binding.usernameEditText.error = "Lowercase letters, numbers, - or _ (max 15)"
             } else {
                 binding.usernameEditText.error = null
@@ -113,7 +113,7 @@ class EditProfileFragment : Fragment() {
         binding.usernameEditText.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
                 val candidate = binding.usernameEditText.text?.toString().orEmpty()
-                if (candidate.isNotBlank() && usernameRegex.matches(candidate)) {
+                if (candidate.isNotBlank() && usernamePattern.matches(candidate)) {
                     // perform remote uniqueness check
                     lifecycleScope.launch {
                         val currentId = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
@@ -177,8 +177,7 @@ class EditProfileFragment : Fragment() {
                 return@setOnClickListener
             }
 
-            val usernameRegex = "^[a-z0-9_-]{1,15}$".toRegex()
-            if (newUsername.isNotBlank() && !usernameRegex.matches(newUsername)) {
+            if (newUsername.isNotBlank() && !usernamePattern.matches(newUsername)) {
                 binding.usernameEditText.error = "Invalid username"
                 return@setOnClickListener
             }

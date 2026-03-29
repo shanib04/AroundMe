@@ -24,7 +24,7 @@
 
     <com.google.android.material.textfield.TextInputLayout
         android:id="@+id/sortInputLayout"
-        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+        style="@style/Widget.AroundMe.TextInputLayout.Dropdown"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="20dp"
@@ -41,13 +41,17 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/feedTitleText">
 
-        <AutoCompleteTextView
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
             android:id="@+id/sortDropdown"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:dropDownVerticalOffset="10dp"
             android:inputType="none"
             android:paddingVertical="14dp"
+            android:popupBackground="@drawable/bg_dropdown_popup"
+            android:popupElevation="18dp"
             android:textColor="@color/text_dark"
+            android:textColorHint="@color/text_light"
             android:textSize="14sp"
             tools:text="Newest" />
     </com.google.android.material.textfield.TextInputLayout>

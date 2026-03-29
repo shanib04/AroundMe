@@ -5,7 +5,6 @@ import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 
@@ -31,34 +30,65 @@ class EventDetailsRepository(
         return firebaseModel.fetchUserById(publisherId)
     }
 
-    // Atomically increments vote counters in Firestore.
-    suspend fun submitVote(eventId: String, voteType: EventVoteType) {
-        val field = when (voteType) {
-            EventVoteType.ACTIVE -> "activeVotes"
-            EventVoteType.INACTIVE -> "inactiveVotes"
-        }
-
-        firestore.collection(EVENTS_COLLECTION)
-            .document(eventId)
-            .update(mapOf(field to FieldValue.increment(1)))
-            .await()
-
-        // Best-effort: track that current user interacted (optional)
-        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        if (uid.isNotBlank()) {
-            firestore.collection(INTERACTIONS_COLLECTION)
-                .document(uid)
-                .collection("events")
+    suspend fun fetchMyVote(eventId: String): EventVoteType? {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return null
+        return try {
+            val snap = firestore.collection(EVENTS_COLLECTION)
                 .document(eventId)
-                .set(
+                .collection(VOTES_SUBCOLLECTION)
+                .document(uid)
+                .get()
+                .await()
+            snap.getString(VOTE_TYPE_FIELD)?.let(::toVoteTypeOrNull)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    // Stores the current user's vote in Firestore and keeps aggregate counters consistent.
+    suspend fun submitVote(eventId: String, voteType: EventVoteType): EventVoteType? {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (uid.isBlank()) return null
+
+        val eventRef = firestore.collection(EVENTS_COLLECTION).document(eventId)
+        val voteRef = eventRef.collection(VOTES_SUBCOLLECTION).document(uid)
+
+        return firestore.runTransaction { tx ->
+            val eventSnap = tx.get(eventRef)
+            val voteSnap = tx.get(voteRef)
+
+            val activeVotes = (eventSnap.getLong(ACTIVE_VOTES_FIELD) ?: 0L).toInt()
+            val inactiveVotes = (eventSnap.getLong(INACTIVE_VOTES_FIELD) ?: 0L).toInt()
+            val existingVote = voteSnap.getString(VOTE_TYPE_FIELD)?.let(::toVoteTypeOrNull)
+            val updatedVote = if (existingVote == voteType) null else voteType
+
+            val nextActiveVotes = activeVotes + voteDelta(existingVote, updatedVote, EventVoteType.ACTIVE)
+            val nextInactiveVotes = inactiveVotes + voteDelta(existingVote, updatedVote, EventVoteType.INACTIVE)
+
+            tx.update(
+                eventRef,
+                mapOf(
+                    ACTIVE_VOTES_FIELD to nextActiveVotes.coerceAtLeast(0),
+                    INACTIVE_VOTES_FIELD to nextInactiveVotes.coerceAtLeast(0),
+                    UPDATED_AT_FIELD to System.currentTimeMillis()
+                )
+            )
+
+            if (updatedVote == null) {
+                tx.delete(voteRef)
+            } else {
+                tx.set(
+                    voteRef,
                     mapOf(
-                        "lastVote" to voteType.name,
-                        "updatedAt" to System.currentTimeMillis()
+                        VOTE_TYPE_FIELD to updatedVote.storageValue,
+                        UPDATED_AT_FIELD to System.currentTimeMillis()
                     ),
                     com.google.firebase.firestore.SetOptions.merge()
                 )
-                .await()
-        }
+            }
+
+            updatedVote
+        }.await()
     }
 
     // Reads current user's rating for this event (1..5) if exists.
@@ -118,8 +148,12 @@ class EventDetailsRepository(
 
     companion object {
         private const val EVENTS_COLLECTION = "events"
-        private const val INTERACTIONS_COLLECTION = "eventInteractions"
         private const val RATINGS_SUBCOLLECTION = "ratings"
+        private const val VOTES_SUBCOLLECTION = "votes"
+        private const val ACTIVE_VOTES_FIELD = "activeVotes"
+        private const val INACTIVE_VOTES_FIELD = "inactiveVotes"
+        private const val UPDATED_AT_FIELD = "lastUpdated"
+        private const val VOTE_TYPE_FIELD = "voteType"
 
         @Volatile private var INSTANCE: EventDetailsRepository? = null
 
@@ -129,4 +163,25 @@ class EventDetailsRepository(
             repo
         }
     }
+
+    private fun toVoteTypeOrNull(rawValue: String): EventVoteType? {
+        return when (rawValue.trim().lowercase()) {
+            "active" -> EventVoteType.ACTIVE
+            "inactive" -> EventVoteType.INACTIVE
+            else -> runCatching { EventVoteType.valueOf(rawValue) }.getOrNull()
+        }
+    }
+
+    private fun voteDelta(
+        existingVote: EventVoteType?,
+        updatedVote: EventVoteType?,
+        targetVote: EventVoteType
+    ): Int {
+        val existingContribution = if (existingVote == targetVote) 1 else 0
+        val updatedContribution = if (updatedVote == targetVote) 1 else 0
+        return updatedContribution - existingContribution
+    }
+
+    private val EventVoteType.storageValue: String
+        get() = name.lowercase()
 }
