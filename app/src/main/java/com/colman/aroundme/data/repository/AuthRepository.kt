@@ -240,7 +240,6 @@ class AuthRepository(
             displayName = primary?.displayName?.ifBlank { fallback.displayName } ?: fallback.displayName,
             profileImageUrl = primary?.profileImageUrl?.ifBlank { fallback.profileImageUrl } ?: fallback.profileImageUrl,
             email = primary?.email?.ifBlank { fallback.email } ?: fallback.email,
-            achievements = primary?.achievements ?: fallback.achievements,
             achievementHistory = primary?.achievementHistory ?: fallback.achievementHistory,
             discoveryRadiusKm = primary?.discoveryRadiusKm ?: fallback.discoveryRadiusKm,
             points = primary?.points ?: fallback.points,

@@ -105,14 +105,6 @@ class UserRepository private constructor(
         userDao.deleteAll()
     }
 
-    suspend fun fetchAllUsersRemote(): List<User> {
-        return try {
-            firebase.fetchAllUsers().map { it.normalizedForDisplay() }
-        } catch (_: Exception) {
-            emptyList()
-        }
-    }
-
     suspend fun syncFromRemoteNow(since: Long = 0L) {
         try {
             val remote = firebase.fetchUsersSince(since)

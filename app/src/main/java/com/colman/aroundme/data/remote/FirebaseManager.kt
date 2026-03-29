@@ -106,7 +106,6 @@ class FirebaseModel private constructor() {
                     "displayName" to user.displayName,
                     "profileImageUrl" to user.profileImageUrl,
                     "email" to user.email,
-                    "achievements" to user.achievements,
                     "achievementHistory" to user.achievementHistory,
                     "discoveryRadiusKm" to user.discoveryRadiusKm,
                     "points" to user.points,
