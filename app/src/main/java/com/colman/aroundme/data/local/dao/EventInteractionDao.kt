@@ -21,6 +21,9 @@ interface EventInteractionDao {
     @Query("SELECT COUNT(*) FROM event_interactions WHERE userId = :userId AND voteType IS NOT NULL")
     suspend fun getValidationCountForUser(userId: String): Int
 
+    @Query("DELETE FROM event_interactions WHERE eventId = :eventId")
+    suspend fun deleteByEventId(eventId: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(interaction: EventInteraction)
 }

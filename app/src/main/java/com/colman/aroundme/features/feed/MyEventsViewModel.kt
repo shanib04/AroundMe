@@ -20,7 +20,7 @@ sealed interface MyEventRow {
 }
 
 class MyEventsViewModel(
-    repository: EventRepository,
+    private val repository: EventRepository,
     private val userRepository: UserRepository,
     auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : ViewModel() {
@@ -30,12 +30,21 @@ class MyEventsViewModel(
     private val allUsers = userRepository.observeAll().asLiveData()
     private val _events = MediatorLiveData<List<MyEventRow>>()
     val events: LiveData<List<MyEventRow>> = _events
+    private val _loading = MediatorLiveData(true)
+    val loading: LiveData<Boolean> = _loading
+    private val _deleteErrorMessage = MediatorLiveData<String?>()
+    val deleteErrorMessage: LiveData<String?> = _deleteErrorMessage
+    private val _deleteSuccessMessage = MediatorLiveData<String?>()
+    val deleteSuccessMessage: LiveData<String?> = _deleteSuccessMessage
 
     private var currentEvents: List<Event> = emptyList()
     private var usersById: Map<String, User> = emptyMap()
+    private var hasLoadedEvents = false
+    private var hasLoadedUsers = false
 
     init {
         _events.addSource(source) { events ->
+            hasLoadedEvents = true
             currentEvents = events.sortedWith(
                 compareBy<Event> { it.isEnded }
                     .thenByDescending { it.publishTime }
@@ -43,6 +52,7 @@ class MyEventsViewModel(
             publishItems()
         }
         _events.addSource(allUsers) { users ->
+            hasLoadedUsers = true
             usersById = users.associateBy { it.id }
             publishItems()
         }
@@ -50,6 +60,13 @@ class MyEventsViewModel(
 
     private fun publishItems() {
         prefetchUsers(currentEvents)
+        val isPublisherResolved = currentUserId.isBlank() || !isPublisherUnresolved(currentUserId)
+        if (!hasLoadedEvents || !hasLoadedUsers || (currentEvents.isNotEmpty() && !isPublisherResolved)) {
+            _loading.value = true
+            _events.value = emptyList()
+            return
+        }
+
         val activeEvents = currentEvents.filterNot { it.isEnded }
         val endedEvents = currentEvents.filter { it.isEnded }
         val rows = mutableListOf<MyEventRow>()
@@ -63,6 +80,7 @@ class MyEventsViewModel(
             rows += endedEvents.map(::eventRowFor)
         }
         _events.value = rows
+        _loading.value = false
     }
 
     private fun eventRowFor(event: Event): MyEventRow.EventRow {
@@ -82,13 +100,30 @@ class MyEventsViewModel(
         val publisherIds = events.map(Event::publisherId)
         viewModelScope.launch {
             userRepository.ensureUsersLoaded(publisherIds)
+            userRepository.refreshUsersFromRemoteNow(publisherIds)
         }
-        publisherIds.forEach { publisherId ->
-            val user = usersById[publisherId]
-            if (publisherId.isNotBlank() && (user == null || user.displayName.isBlank())) {
-                userRepository.refreshUserFromRemote(publisherId)
+    }
+
+    private fun isPublisherUnresolved(userId: String): Boolean {
+        val user = usersById[userId] ?: return true
+        return user.displayName.isBlank() && user.username.isBlank()
+    }
+
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.deleteEvent(eventId)
+            }.onSuccess {
+                _deleteSuccessMessage.value = "Event deleted"
+            }.onFailure { error ->
+                _deleteErrorMessage.value = error.message ?: "Unable to delete event right now."
             }
         }
+    }
+
+    fun onDeleteMessageShown() {
+        _deleteErrorMessage.value = null
+        _deleteSuccessMessage.value = null
     }
 
     class Factory(

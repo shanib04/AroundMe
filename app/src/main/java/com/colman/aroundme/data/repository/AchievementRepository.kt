@@ -5,17 +5,19 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.flow.first
 
 class AchievementRepository private constructor(
     private val application: Application,
     private val userRepository: UserRepository
 ) {
+    private val firebase by lazy { FirebaseModel.getInstance() }
 
     suspend fun unlockFreshFace(userId: String) {
         val normalizedUserId = userId.trim()
         if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val user = loadPersistedUser(normalizedUserId)
         val freshFaceName = application.getString(R.string.achievement_fresh_face)
         if (user.achievementHistory.any { it.name == freshFaceName }) return
 
@@ -35,7 +37,7 @@ class AchievementRepository private constructor(
     suspend fun unlockForCreatedEvent(userId: String) {
         val normalizedUserId = userId.trim()
         if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val user = loadPersistedUser(normalizedUserId)
         persistAchievements(
             user = user,
             eventCount = user.eventsPublishedCount,
@@ -50,7 +52,7 @@ class AchievementRepository private constructor(
     suspend fun unlockForValidation(userId: String) {
         val normalizedUserId = userId.trim()
         if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val user = loadPersistedUser(normalizedUserId)
         persistAchievements(
             user = user,
             eventCount = user.eventsPublishedCount,
@@ -65,7 +67,7 @@ class AchievementRepository private constructor(
     suspend fun unlockForPublisherEventState(event: Event) {
         val publisherId = event.publisherId.trim()
         if (publisherId.isBlank()) return
-        val user = userRepository.getUserById(publisherId).first() ?: User(id = publisherId)
+        val user = loadPersistedUser(publisherId)
         val eventDrivenAchievements = buildEventDrivenAchievements(event)
         persistAchievements(
             user = user,
@@ -76,6 +78,21 @@ class AchievementRepository private constructor(
             preserveUpdatedCounts = false,
             includeFreshFace = false
         )
+    }
+
+    private suspend fun loadPersistedUser(userId: String): User {
+        val localUser = userRepository.getUserById(userId).first()
+        if (localUser != null) {
+            return localUser
+        }
+
+        val remoteUser = runCatching { firebase.fetchUserById(userId) }.getOrNull()
+        if (remoteUser != null) {
+            userRepository.upsertUser(remoteUser, pushToRemote = false)
+            return remoteUser
+        }
+
+        return User(id = userId)
     }
 
     private suspend fun persistAchievements(

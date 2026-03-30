@@ -26,6 +26,7 @@ data class FeedEventItem(
 data class FeedUiState(
     val items: List<FeedEventItem> = emptyList(),
     val sortOption: FeedSortOption = FeedSortOption.NEWEST,
+    val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
     val hasMore: Boolean = true,
@@ -58,17 +59,22 @@ class FeedViewModel(
     private var userLocationLabel = DEFAULT_FEED_LOCATION_LABEL
     private var sourceUsersById: Map<String, User> = emptyMap()
     private var scrollToTopToken: Long = 0L
+    private var hasLoadedEvents = false
+    private var hasLoadedUsers = false
+    private var resolvingPublisherIds: Set<String> = emptySet()
 
     val uiState: LiveData<FeedUiState> = uiStateSource
 
     init {
         uiStateSource.value = FeedUiState(emptyMessage = "Pull to refresh to load nearby events.")
         uiStateSource.addSource(allEvents) { events ->
+            hasLoadedEvents = true
             sourceEvents = events.filterNot { it.isEnded }
             currentPageSize = currentPageSize.coerceAtMost(sourceEvents.size.coerceAtLeast(PAGE_SIZE))
             publishState()
         }
         uiStateSource.addSource(allUsers) { users ->
+            hasLoadedUsers = true
             sourceUsersById = users.associateBy { it.id }
             publishState()
         }
@@ -87,7 +93,6 @@ class FeedViewModel(
         if (currentPageSize >= sorted.size) return
 
         isLoadingMore = true
-        publishState()
         currentPageSize = (currentPageSize + PAGE_SIZE).coerceAtMost(sorted.size)
         isLoadingMore = false
         publishState()
@@ -103,17 +108,29 @@ class FeedViewModel(
     }
 
     private fun publishState() {
-        prefetchUsers(sourceEvents)
         val sorted = sortedEvents(sourceEvents, currentSortOption)
         val visibleCount = currentPageSize.coerceAtMost(sorted.size.coerceAtLeast(PAGE_SIZE))
-        val visibleItems = sorted.take(visibleCount).map { it.toFeedEventItem(userLocation) }
+        val visibleEvents = sorted.take(visibleCount)
+        val unresolvedPublisherIds = visibleEvents
+            .map(Event::publisherId)
+            .map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .filter(::isPublisherUnresolved)
+
+        prefetchUsers(visibleEvents)
+        resolveVisiblePublishers(unresolvedPublisherIds)
+
+        val isInitialLoading = !hasLoadedEvents
+        val visibleItems = visibleEvents.map { it.toFeedEventItem(userLocation) }
         uiStateSource.value = FeedUiState(
             items = visibleItems,
             sortOption = currentSortOption,
+            isInitialLoading = isInitialLoading,
             isRefreshing = isRefreshing,
             isLoadingMore = isLoadingMore,
             hasMore = visibleCount < sorted.size,
-            emptyMessage = if (sorted.isEmpty()) "No events to show yet." else "",
+            emptyMessage = if (!isInitialLoading && sorted.isEmpty()) "No events to show yet." else "",
             userLocationLabel = userLocationLabel,
             scrollToTopToken = scrollToTopToken
         )
@@ -190,12 +207,28 @@ class FeedViewModel(
         viewModelScope.launch {
             userRepository.ensureUsersLoaded(publisherIds)
         }
-        publisherIds.forEach { publisherId ->
-            val user = sourceUsersById[publisherId]
-            if (publisherId.isNotBlank() && (user == null || user.displayName.isBlank())) {
-                userRepository.refreshUserFromRemote(publisherId)
-            }
+    }
+
+    private fun resolveVisiblePublishers(publisherIds: List<String>) {
+        if (publisherIds.isEmpty()) {
+            resolvingPublisherIds = emptySet()
+            return
         }
+
+        val requestedIds = publisherIds.toSet()
+        if (requestedIds == resolvingPublisherIds) {
+            return
+        }
+
+        resolvingPublisherIds = requestedIds
+        viewModelScope.launch {
+            userRepository.refreshUsersFromRemoteNow(requestedIds)
+        }
+    }
+
+    private fun isPublisherUnresolved(userId: String): Boolean {
+        val user = sourceUsersById[userId] ?: return true
+        return user.displayName.isBlank() && user.username.isBlank()
     }
 
     class Factory(

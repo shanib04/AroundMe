@@ -21,6 +21,7 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
@@ -141,6 +142,11 @@ class EventDetailsFragment : Fragment() {
             renderPublisher(user)
         }
 
+        viewModel.screenLoading.observe(viewLifecycleOwner) { loading ->
+            binding.detailsLoadingOverlay.isVisible = loading
+            binding.scrollView.isVisible = !loading
+        }
+
         viewModel.selectedVoteType.observe(viewLifecycleOwner) { voteType ->
             renderVoteSelection(voteType)
         }
@@ -233,7 +239,7 @@ class EventDetailsFragment : Fragment() {
         binding.publisherHandle.isVisible = !binding.publisherHandle.text.isNullOrBlank()
 
         Glide.with(this)
-            .load(user?.profileImageUrl?.ifBlank { null })
+            .load(user?.versionedProfileImageUrl()?.ifBlank { null })
             .placeholder(R.drawable.ic_person_placeholder)
             .error(R.drawable.ic_person_placeholder)
             .centerCrop()

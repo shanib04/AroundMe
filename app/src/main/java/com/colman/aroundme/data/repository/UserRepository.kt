@@ -26,12 +26,45 @@ class UserRepository private constructor(
     // Fetch a single user from Firebase and upsert locally (best-effort, non-blocking)
     fun refreshUserFromRemote(id: String) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
-            } catch (_: Exception) {
-                // ignore
-            }
+            refreshUserFromRemoteNow(id)
         }
+    }
+
+    suspend fun refreshUserFromRemoteNow(id: String): User? {
+        val normalizedUserId = id.trim()
+        if (normalizedUserId.isBlank()) return null
+
+        return try {
+            val remoteUser = firebase.fetchUserById(normalizedUserId)?.normalizedForDisplay()
+            val localUser = userDao.getUserById(normalizedUserId).first()
+            when {
+                remoteUser == null -> {
+                    if (localUser != null) {
+                        userDao.deleteById(normalizedUserId)
+                    }
+                    null
+                }
+
+                localUser != remoteUser -> {
+                    if (localUser != null) {
+                        userDao.deleteById(normalizedUserId)
+                    }
+                    userDao.insert(remoteUser)
+                    remoteUser
+                }
+
+                else -> remoteUser
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    suspend fun refreshUsersFromRemoteNow(ids: Collection<String>) {
+        ids.map(String::trim)
+            .filter(String::isNotBlank)
+            .distinct()
+            .forEach { id -> refreshUserFromRemoteNow(id) }
     }
 
     suspend fun upsertUser(user: User, pushToRemote: Boolean = true) {
@@ -50,7 +83,11 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun awardEventCreated(userId: String, pointsAward: Int = 10, pushToRemote: Boolean = true) {
+    suspend fun awardEventCreated(
+        userId: String,
+        pointsAward: Int = EVENT_CREATED_POINTS_AWARD,
+        pushToRemote: Boolean = true
+    ) {
         updateUserStats(userId, pushToRemote) { existing ->
             existing.copy(
                 points = existing.points + pointsAward,
@@ -60,7 +97,11 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun awardValidation(userId: String, pointsAward: Int = 2, pushToRemote: Boolean = true) {
+    suspend fun awardValidation(
+        userId: String,
+        pointsAward: Int = VALIDATION_POINTS_AWARD,
+        pushToRemote: Boolean = true
+    ) {
         updateUserStats(userId, pushToRemote) { existing ->
             existing.copy(
                 points = existing.points + pointsAward,
@@ -172,13 +213,16 @@ class UserRepository private constructor(
             .distinct()
             .forEach { id ->
                 val existing = userDao.getUserById(id).first()
-                if (existing == null || existing.displayName.isBlank()) {
-                    firebase.fetchUserById(id)?.let { userDao.insert(it.normalizedForDisplay()) }
+                if (existing == null || existing.displayName.isBlank() || existing.username.isBlank()) {
+                    refreshUserFromRemoteNow(id)
                 }
             }
     }
 
     companion object {
+        const val EVENT_CREATED_POINTS_AWARD = 10
+        const val VALIDATION_POINTS_AWARD = 2
+
         @Volatile
         private var INSTANCE: UserRepository? = null
 

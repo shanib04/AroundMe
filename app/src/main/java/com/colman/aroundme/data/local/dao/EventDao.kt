@@ -33,6 +33,9 @@ interface EventDao {
     @Query("SELECT * FROM events WHERE publisherId = :pubId ORDER BY lastUpdated DESC")
     fun getEventsByPublisher(pubId: String): LiveData<List<Event>>
 
+    @Query("SELECT COUNT(*) FROM events WHERE publisherId = :pubId")
+    suspend fun getCountByPublisher(pubId: String): Int
+
     @Query("DELETE FROM events WHERE publisherId = :pubId")
     suspend fun deleteEventsByPublisher(pubId: String)
 

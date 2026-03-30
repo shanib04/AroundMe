@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
@@ -13,6 +14,7 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MyEventsFragment : Fragment() {
 
@@ -28,8 +30,10 @@ class MyEventsFragment : Fragment() {
 
     private val adapter by lazy {
         MyEventsAdapter(
+            onEventClick = ::openEventDetails,
             onEditClick = ::openEditEvent,
-            onRecreateClick = ::openRecreateEvent
+            onRecreateClick = ::openRecreateEvent,
+            onDeleteClick = ::confirmDeleteEvent
         )
     }
 
@@ -61,6 +65,24 @@ class MyEventsFragment : Fragment() {
             binding.emptyText.isVisible = rows.none { it is MyEventRow.EventRow }
             binding.emptyText.text = getString(R.string.my_events_empty)
         }
+
+        viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            binding.initialLoadingContainer.isVisible = loading
+            binding.feedRecyclerView.isVisible = !loading
+            binding.emptyText.isVisible = !loading && adapter.currentList.none { it is MyEventRow.EventRow }
+        }
+
+        viewModel.deleteSuccessMessage.observe(viewLifecycleOwner) { message ->
+            if (message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            viewModel.onDeleteMessageShown()
+        }
+
+        viewModel.deleteErrorMessage.observe(viewLifecycleOwner) { message ->
+            if (message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            viewModel.onDeleteMessageShown()
+        }
     }
 
     private fun openEditEvent(eventId: String) {
@@ -77,6 +99,24 @@ class MyEventsFragment : Fragment() {
             putString("mode", "recreate")
         }
         findNavController().navigate(R.id.createEventFragment, bundle)
+    }
+
+    private fun openEventDetails(eventId: String) {
+        findNavController().navigate(
+            R.id.eventDetailsFragment,
+            Bundle().apply { putString("eventId", eventId) }
+        )
+    }
+
+    private fun confirmDeleteEvent(eventId: String) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.my_events_delete_title)
+            .setMessage(R.string.my_events_delete_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.my_events_delete_action) { _, _ ->
+                viewModel.deleteEvent(eventId)
+            }
+            .show()
     }
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()

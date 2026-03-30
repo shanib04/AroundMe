@@ -5,9 +5,8 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.databinding.ViewEventCardBinding
-import com.squareup.picasso.MemoryPolicy
-import com.squareup.picasso.NetworkPolicy
 import com.squareup.picasso.Picasso
 import java.util.Locale
 import kotlin.math.atan2
@@ -70,8 +69,6 @@ data class EventCardItem(
             .load(hostAvatarUrl)
             .placeholder(R.drawable.ic_person_placeholder)
             .error(R.drawable.ic_person_placeholder)
-            .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
-            .networkPolicy(NetworkPolicy.NO_CACHE)
             .fit()
             .centerCrop()
             .into(binding.hostAvatarImageView)
@@ -106,7 +103,7 @@ object EventCardItemMapper {
             event = event,
             hostName = user?.displayName?.takeIf { it.isNotBlank() } ?: EventTextFormatter.unknownPublisherText(),
             hostSubtitle = event.category.ifBlank { EventTextFormatter.eventHostFallbackText() },
-            hostAvatarUrl = user?.profileImageUrl.orEmpty(),
+            hostAvatarUrl = user?.versionedProfileImageUrl().orEmpty(),
             locationText = event.locationName.ifBlank { EventTextFormatter.unknownLocationText() },
             distanceLabelText = distanceLabelText,
             statusText = statusText,

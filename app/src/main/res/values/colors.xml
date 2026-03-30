@@ -80,6 +80,9 @@
     <color name="my_events_edit_button_text">#0B4DA3</color>
     <color name="my_events_recreate_button">#FFF1B8</color>
     <color name="my_events_recreate_button_text">#8A5A00</color>
+    <color name="my_events_delete_button">#FFF2F2</color>
+    <color name="my_events_delete_button_text">#AF2133</color>
+    <color name="my_events_delete_button_stroke">#F4C8CF</color>
     <color name="dropdown_popup_stroke">#DDE6F0</color>
     <color name="dropdown_option_text">#22324A</color>
     <color name="dropdown_option_pressed">#FFF0E8</color>

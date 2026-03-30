@@ -123,19 +123,33 @@ class EventRepository private constructor(
             firebase.pushEvent(event)
         }
         if (existingEvent == null) {
-            userRepository.awardEventCreated(event.publisherId)
+            syncUserDerivedStats(event.publisherId)
             achievementRepository.unlockForCreatedEvent(event.publisherId)
         }
     }
 
     suspend fun deleteEvent(id: String) {
+        val existingEvent = eventDao.getByIdNow(id)
+        eventInteractionDao.deleteByEventId(id)
         eventDao.deleteById(id)
-        // optionally remove from firebase
+        runCatching { firebase.deleteEvent(id) }
+            .onFailure { error ->
+                Log.w(TAG, "deleteEvent remote delete failed for $id", error)
+            }
+        existingEvent?.publisherId?.takeIf(String::isNotBlank)?.let { publisherId ->
+            syncUserDerivedStats(publisherId)
+        }
     }
 
     suspend fun deleteEventsByPublisher(pubId: String, removeRemote: Boolean = true) {
         eventDao.deleteEventsByPublisher(pubId)
-        // Remote deletion is orchestrated by AuthRepository for account deletion flows.
+        if (removeRemote) {
+            runCatching { firebase.deleteUserAndEvents(pubId) }
+                .onFailure { error ->
+                    Log.w(TAG, "deleteEventsByPublisher remote cleanup failed for $pubId", error)
+                }
+        }
+                syncUserDerivedStats(pubId)
     }
 
     // Voting / Rating
@@ -226,7 +240,7 @@ class EventRepository private constructor(
         eventInteractionDao.upsert(updatedInteraction)
 
         if (previousVoteType == null && updatedVoteType != null) {
-            userRepository.awardValidation(userId, pushToRemote = false)
+            syncUserDerivedStats(userId)
             runCatching { achievementRepository.unlockForValidation(userId) }
                 .onFailure { error ->
                     Log.w(TAG, "unlockForValidation failed after successful vote", error)
@@ -240,6 +254,23 @@ class EventRepository private constructor(
             }
 
         return updatedVoteType
+    }
+
+    private suspend fun syncUserDerivedStats(userId: String) {
+        val normalizedUserId = userId.trim()
+        if (normalizedUserId.isBlank()) return
+
+        val eventCount = eventDao.getCountByPublisher(normalizedUserId)
+        val validationCount = eventInteractionDao.getValidationCountForUser(normalizedUserId)
+        val points = (eventCount * UserRepository.EVENT_CREATED_POINTS_AWARD) +
+            (validationCount * UserRepository.VALIDATION_POINTS_AWARD)
+
+        userRepository.updateDerivedStats(
+            userId = normalizedUserId,
+            eventsPublishedCount = eventCount,
+            validationsMadeCount = validationCount,
+            points = points
+        )
     }
 
     suspend fun submitRating(eventId: String, rating: Int): EventInteraction? {

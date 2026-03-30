@@ -20,6 +20,7 @@ import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
@@ -408,7 +409,11 @@ class CreateEventFragment : Fragment() {
                 is CreateEventUiState.Success -> {
                     binding.loadingOverlay.isVisible = false
                     Toast.makeText(context, "Event created successfully!", Toast.LENGTH_SHORT).show()
-                    findNavController().popBackStack()
+                    if (eventMode == "edit") {
+                        findNavController().popBackStack()
+                    } else {
+                        openEventDetails(state.eventId)
+                    }
                 }
                 is CreateEventUiState.Error -> {
                     binding.loadingOverlay.isVisible = false
@@ -458,6 +463,17 @@ class CreateEventFragment : Fragment() {
 
     private fun hasEventImage(): Boolean {
         return viewModel.selectedImageUri.value != null || !viewModel.editingEvent.value?.imageUrl.isNullOrBlank()
+    }
+
+    private fun openEventDetails(eventId: String) {
+        val navController = findNavController()
+        navController.navigate(
+            R.id.eventDetailsFragment,
+            Bundle().apply { putString("eventId", eventId) },
+            NavOptions.Builder()
+                .setPopUpTo(R.id.createEventFragment, true)
+                .build()
+        )
     }
 
     private fun renderEventImage(selectedUri: Uri?, existingImageUrl: String?) {

@@ -42,6 +42,9 @@ class EventDetailsViewModel(
     private val _publisher = MutableLiveData<User?>()
     val publisher: LiveData<User?> = _publisher
 
+    private val _screenLoading = MutableLiveData(true)
+    val screenLoading: LiveData<Boolean> = _screenLoading
+
     private val _isSubmittingVote = MutableLiveData(false)
     val isSubmittingVote: LiveData<Boolean> = _isSubmittingVote
 
@@ -90,9 +93,10 @@ class EventDetailsViewModel(
             eventRepository.getEventDetails(eventId).collectLatest { e ->
                 _event.value = e
                 e?.let { ev ->
-                    // Load publisher (Room first, fallback remote)
                     val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
-                    _publisher.value = roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+                    val refreshedPublisher = userRepository.refreshUserFromRemoteNow(ev.publisherId)
+                    _publisher.value = refreshedPublisher ?: roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+                    _screenLoading.value = false
 
                     if (ev.latitude != 0.0 && ev.longitude != 0.0) {
                         loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)

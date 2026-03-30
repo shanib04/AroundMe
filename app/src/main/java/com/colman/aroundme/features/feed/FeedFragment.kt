@@ -140,10 +140,11 @@ class FeedFragment : Fragment() {
                 binding.feedRecyclerView.scrollToPosition(0)
             }
         }
+        binding.initialLoadingContainer.isVisible = state.isInitialLoading
         binding.loadingMoreIndicator.isVisible = state.isLoadingMore && state.items.isNotEmpty()
-        binding.emptyText.isVisible = state.items.isEmpty()
+        binding.emptyText.isVisible = state.items.isEmpty() && !state.isInitialLoading
         binding.emptyText.text = state.emptyMessage
-        binding.feedRecyclerView.isVisible = state.items.isNotEmpty()
+        binding.feedRecyclerView.isVisible = state.items.isNotEmpty() && !state.isInitialLoading
     }
 
     private fun requestLocationForDistance() {

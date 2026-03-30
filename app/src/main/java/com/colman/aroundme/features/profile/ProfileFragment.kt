@@ -12,7 +12,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.FragmentProfileBinding
@@ -131,13 +130,16 @@ class ProfileFragment : Fragment() {
                     .load(uri)
                     .placeholder(R.drawable.ic_person_placeholder)
                     .error(R.drawable.ic_person_placeholder)
-                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                    .skipMemoryCache(true)
                     .circleCrop()
                     .into(profileBinding.profileImageView)
             } else {
                 profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
             }
+        }
+
+        viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            profileBinding.profileLoadingOverlay.isVisible = loading
+            profileBinding.scrollContent.isVisible = !loading
         }
 
         viewModel.displayName.observe(viewLifecycleOwner) { displayName ->

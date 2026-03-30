@@ -337,6 +337,23 @@
             tools:text="Edit Event"
             tools:visibility="visible" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/ownerDeleteButton"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="10dp"
+            android:text="@string/my_events_delete_action"
+            android:textAllCaps="false"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            app:backgroundTint="@color/my_events_delete_button"
+            app:cornerRadius="20dp"
+            app:strokeColor="@color/my_events_delete_button_stroke"
+            app:strokeWidth="1dp"
+            android:textColor="@color/my_events_delete_button_text"
+            tools:visibility="visible" />
+
         <TextView
             android:id="@+id/postedTimeText"
             android:layout_width="wrap_content"

@@ -168,6 +168,13 @@ class FirebaseModel private constructor() {
         }
     }
 
+    suspend fun deleteEvent(eventId: String) {
+        firestore.collection(EVENTS_COLLECTION)
+            .document(eventId)
+            .delete()
+            .await()
+    }
+
     suspend fun fetchAllUsers(): List<User> {
         return try {
             firestore.collection(USERS_COLLECTION)

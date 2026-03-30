@@ -174,6 +174,7 @@ class EditProfileFragment : Fragment() {
         }
 
         viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            binding.initialLoadingOverlay.visibility = if (loading) View.VISIBLE else View.GONE
             binding.saveProgress.visibility = if (loading) View.VISIBLE else View.GONE
             binding.saveButton.isEnabled = !loading
             binding.deleteButton.isEnabled = !loading

@@ -17,7 +17,7 @@ import java.util.UUID
 sealed class CreateEventUiState {
     data object Idle : CreateEventUiState()
     data object Loading : CreateEventUiState()
-    data object Success : CreateEventUiState()
+    data class Success(val eventId: String) : CreateEventUiState()
     data class Error(val message: String) : CreateEventUiState()
 }
 
@@ -27,6 +27,7 @@ class CreateEventViewModel(
 
     private val _uiState = MutableLiveData<CreateEventUiState>(CreateEventUiState.Idle)
     val uiState: LiveData<CreateEventUiState> = _uiState
+    private var saveInFlight = false
 
     // State preservation for Fragment recreation/navigation
     private val _tags = MutableLiveData<List<String>>(emptyList())
@@ -125,12 +126,13 @@ class CreateEventViewModel(
             return
         }
 
-        _uiState.value = CreateEventUiState.Loading
+        if (!tryStartSave()) return
+
         viewModelScope.launch {
             try {
                 val user = FirebaseAuth.getInstance().currentUser
                 if (user == null) {
-                    _uiState.value = CreateEventUiState.Error("You must be logged in to create events.")
+                    finishSave(CreateEventUiState.Error("You must be logged in to create events."))
                     return@launch
                 }
 
@@ -164,9 +166,9 @@ class CreateEventViewModel(
                 )
 
                 repository.upsertEvent(event, pushToRemote = true)
-                _uiState.value = CreateEventUiState.Success
+                finishSave(CreateEventUiState.Success(event.id))
             } catch (e: Exception) {
-                _uiState.value = CreateEventUiState.Error(e.message ?: "Failed to create event")
+                finishSave(CreateEventUiState.Error(e.message ?: "Failed to create event"))
             }
         }
     }
@@ -185,7 +187,8 @@ class CreateEventViewModel(
         expirationTime: Long,
         imageUri: Uri?
     ) {
-        _uiState.value = CreateEventUiState.Loading
+        if (!tryStartSave()) return
+
         viewModelScope.launch {
             try {
                 val existing = repository.getEventById(eventId).firstOrNull()
@@ -213,11 +216,23 @@ class CreateEventViewModel(
                     ),
                     pushToRemote = true
                 )
-                _uiState.value = CreateEventUiState.Success
+                finishSave(CreateEventUiState.Success(eventId))
             } catch (e: Exception) {
-                _uiState.value = CreateEventUiState.Error(e.message ?: "Failed to update event")
+                finishSave(CreateEventUiState.Error(e.message ?: "Failed to update event"))
             }
         }
+    }
+
+    private fun tryStartSave(): Boolean {
+        if (saveInFlight) return false
+        saveInFlight = true
+        _uiState.value = CreateEventUiState.Loading
+        return true
+    }
+
+    private fun finishSave(state: CreateEventUiState) {
+        saveInFlight = false
+        _uiState.postValue(state)
     }
 
     class Factory(private val repository: EventRepository) : ViewModelProvider.Factory {
