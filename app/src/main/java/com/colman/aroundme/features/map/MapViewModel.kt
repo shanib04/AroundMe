@@ -32,6 +32,9 @@ class MapViewModel(
     private val allEvents = repository.observeAll().asLiveData()
     private val _timeTick = MutableLiveData(System.currentTimeMillis())
 
+    private val _isLoading = MutableLiveData(true)
+    val isLoading: LiveData<Boolean> = _isLoading
+
     // Expose a snapshot of active events for global event search.
     fun allEventsSnapshot(): List<Event> = activeEvents(allEvents.value.orEmpty())
 
@@ -91,9 +94,10 @@ class MapViewModel(
         _selectedEvent.addSource(_filteredEvents) { updateSelectedEvent(it) }
         _selectedEvent.addSource(_selectedEventId) { updateSelectedEvent(_filteredEvents.value.orEmpty()) }
 
+        repository.startEventsRealtimeSync()
         viewModelScope.launch {
-            // trigger initial sync from remote
-            repository.syncFromRemote(0L)
+            repository.syncFromRemoteNow(0L)
+            _isLoading.postValue(false)
         }
 
         viewModelScope.launch {

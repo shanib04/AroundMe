@@ -15,9 +15,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -31,30 +29,8 @@ class EventRepository private constructor(
     private val achievementRepository: AchievementRepository
 ) {
 
-    // Primary events feed: sourced from Firebase (Firestore). Room is a best-effort cache.
-    fun observeAll(): Flow<List<Event>> = callbackFlow {
-        val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
-            .addSnapshotListener { snaps, err ->
-                if (err != null) {
-                    Log.e(TAG, "observeAll listener error", err)
-                    trySend(emptyList())
-                    return@addSnapshotListener
-                }
-
-                val events = snaps?.documents?.mapNotNull { it.toObject(Event::class.java) }
-                    ?.sortedByDescending { it.lastUpdated }
-                    .orEmpty()
-
-                // update local cache (best-effort)
-                CoroutineScope(Dispatchers.IO).launch {
-                    events.forEach { eventDao.insert(it) }
-                }
-
-                trySend(events)
-            }
-
-        awaitClose { reg.remove() }
-    }
+    // Rule 1: Room is the single source of truth. UI observes Room; Firebase syncs into Room.
+    fun observeAll(): Flow<List<Event>> = eventDao.observeAll()
 
     // Compatibility method for existing UI code
     fun getEvents(): Flow<List<Event>> = observeAll()
@@ -66,25 +42,22 @@ class EventRepository private constructor(
 
     fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
 
-    // Real-time event details from Firestore.
-    fun getEventDetails(eventId: String): Flow<Event?> = callbackFlow {
-        val reg: ListenerRegistration = firestore.collection(EVENTS_COLLECTION)
-            .document(eventId)
-            .addSnapshotListener { snap, err ->
-                if (err != null) {
-                    Log.e(TAG, "getEventDetails listener error", err)
-                    trySend(null)
-                    return@addSnapshotListener
-                }
-                val event = snap?.toObject(Event::class.java)
-                trySend(event)
-                // Keep local cache warm for other screens
-                if (event != null) {
-                    CoroutineScope(Dispatchers.IO).launch { eventDao.insert(event) }
-                }
-            }
+    fun getEventDetails(eventId: String): Flow<Event?> = eventDao.getById(eventId)
 
-        awaitClose { reg.remove() }
+    // Fetch a single event from Firestore and upsert into Room.
+    suspend fun refreshEventFromRemote(eventId: String) {
+        try {
+            val remoteEvent = firestore.collection(EVENTS_COLLECTION)
+                .document(eventId)
+                .get()
+                .await()
+                .toObject(Event::class.java)
+            if (remoteEvent != null) {
+                eventDao.insert(remoteEvent)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "refreshEventFromRemote failed for $eventId", e)
+        }
     }
 
     // Real-time event list synchronization from Firestore into Room.
@@ -360,33 +333,50 @@ class EventRepository private constructor(
 
     fun syncFromRemote(since: Long = 0L) {
         CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val remote = firebase.fetchEventsSince(since)
-                val userId = identityRepository.getUserId()
-                for (r in remote) {
-                    eventDao.insert(r)
-                    val remoteRating = firebase.fetchEventRating(r.id, userId)
-                    if (remoteRating != null) {
-                        val existingInteraction = eventInteractionDao.getInteraction(r.id, userId)
-                        eventInteractionDao.upsert(
-                            EventInteraction(
-                                eventId = r.id,
-                                userId = userId,
-                                voteType = existingInteraction?.voteType,
-                                rating = remoteRating,
-                                lastUpdated = maxOf(existingInteraction?.lastUpdated ?: 0L, r.lastUpdated)
-                            )
+            syncFromRemoteNow(since)
+        }
+    }
+
+    suspend fun syncFromRemoteNow(since: Long = 0L) {
+        try {
+            val remote = firebase.fetchEventsSince(since)
+            val userId = identityRepository.getUserId()
+            for (r in remote) {
+                eventDao.insert(r)
+                val remoteRating = firebase.fetchEventRating(r.id, userId)
+                if (remoteRating != null) {
+                    val existingInteraction = eventInteractionDao.getInteraction(r.id, userId)
+                    eventInteractionDao.upsert(
+                        EventInteraction(
+                            eventId = r.id,
+                            userId = userId,
+                            voteType = existingInteraction?.voteType,
+                            rating = remoteRating,
+                            lastUpdated = maxOf(existingInteraction?.lastUpdated ?: 0L, r.lastUpdated)
                         )
-                    }
+                    )
                 }
-            } catch (e: Exception) {
-                Log.e(TAG, "syncFromRemote failed", e)
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "syncFromRemote failed", e)
         }
     }
 
     suspend fun getValidationCountForUser(userId: String): Int {
         return eventInteractionDao.getValidationCountForUser(userId)
+    }
+
+    suspend fun fetchNextPage(pageSize: Int, startAfterTimestamp: Long? = null): Int {
+        return try {
+            val remote = firebase.fetchEventsPaginated(pageSize, startAfterTimestamp)
+            for (r in remote) {
+                eventDao.insert(r)
+            }
+            remote.size
+        } catch (e: Exception) {
+            Log.e(TAG, "fetchNextPage failed", e)
+            0
+        }
     }
 
     fun observeInteraction(eventId: String) =

@@ -77,6 +77,7 @@ class EventDetailsViewModel(
     init {
         observeEventRealtime()
         refreshMyInteraction()
+        viewModelScope.launch { eventRepository.refreshEventFromRemote(eventId) }
     }
 
     private fun refreshMyInteraction() {

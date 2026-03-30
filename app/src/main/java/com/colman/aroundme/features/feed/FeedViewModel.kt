@@ -39,7 +39,7 @@ enum class FeedSortOption(val label: String) {
 }
 
 class FeedViewModel(
-    repository: EventRepository,
+    private val repository: EventRepository,
     private val userRepository: UserRepository
 ) : ViewModel() {
 
@@ -58,6 +58,7 @@ class FeedViewModel(
     private var hasLoadedEvents = false
     private var hasLoadedUsers = false
     private var resolvingPublisherIds: Set<String> = emptySet()
+    private var noMoreRemotePages = false
 
     val uiState: LiveData<FeedUiState> = uiStateSource
 
@@ -74,6 +75,11 @@ class FeedViewModel(
             sourceUsersById = users.associateBy { it.id }
             publishState()
         }
+        repository.startEventsRealtimeSync()
+        viewModelScope.launch {
+            val fetched = repository.fetchNextPage(PAGE_SIZE)
+            if (fetched < PAGE_SIZE) noMoreRemotePages = true
+        }
     }
 
     fun setSortOption(sortOption: FeedSortOption) {
@@ -86,7 +92,21 @@ class FeedViewModel(
     fun loadMoreEvents() {
         if (isLoadingMore) return
         val sorted = sortedEvents(sourceEvents, currentSortOption)
-        if (currentPageSize >= sorted.size) return
+        if (currentPageSize >= sorted.size) {
+            // All local events displayed; fetch next page from Firebase.
+            isLoadingMore = true
+            publishState()
+            viewModelScope.launch {
+                val oldestTimestamp = sourceEvents.minOfOrNull { it.lastUpdated }
+                val fetched = repository.fetchNextPage(PAGE_SIZE, oldestTimestamp)
+                isLoadingMore = false
+                if (fetched == 0) {
+                    noMoreRemotePages = true
+                }
+                publishState()
+            }
+            return
+        }
 
         isLoadingMore = true
         currentPageSize = (currentPageSize + PAGE_SIZE).coerceAtMost(sorted.size)
@@ -125,7 +145,7 @@ class FeedViewModel(
             isInitialLoading = isInitialLoading,
             isRefreshing = false,
             isLoadingMore = isLoadingMore,
-            hasMore = visibleCount < sorted.size,
+            hasMore = visibleCount < sorted.size || !noMoreRemotePages,
             emptyMessage = if (!isInitialLoading && sorted.isEmpty()) "No events to show yet." else "",
             userLocationLabel = userLocationLabel,
             scrollToTopToken = scrollToTopToken

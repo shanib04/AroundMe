@@ -215,6 +215,20 @@ class FirebaseModel private constructor() {
         }
     }
 
+    suspend fun fetchEventsPaginated(pageSize: Int, startAfterTimestamp: Long? = null): List<Event> {
+        return try {
+            var query = firestore.collection(EVENTS_COLLECTION)
+                .orderBy("lastUpdated", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(pageSize.toLong())
+            if (startAfterTimestamp != null) {
+                query = query.startAfter(startAfterTimestamp)
+            }
+            query.get().await().documents.mapNotNull { it.toObject(Event::class.java) }
+        } catch (_: FirebaseFirestoreException) {
+            emptyList()
+        }
+    }
+
     suspend fun fetchUserById(id: String): User? {
         return try {
             firestore.collection(USERS_COLLECTION)
