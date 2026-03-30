@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-// Repository pattern for User data
 class UserRepository private constructor(
     private val userDao: UserDao,
     private val firebase: FirebaseModel
@@ -83,34 +82,6 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun awardEventCreated(
-        userId: String,
-        pointsAward: Int = EVENT_CREATED_POINTS_AWARD,
-        pushToRemote: Boolean = true
-    ) {
-        updateUserStats(userId, pushToRemote) { existing ->
-            existing.copy(
-                points = existing.points + pointsAward,
-                eventsPublishedCount = existing.eventsPublishedCount + 1,
-                lastUpdated = System.currentTimeMillis()
-            )
-        }
-    }
-
-    suspend fun awardValidation(
-        userId: String,
-        pointsAward: Int = VALIDATION_POINTS_AWARD,
-        pushToRemote: Boolean = true
-    ) {
-        updateUserStats(userId, pushToRemote) { existing ->
-            existing.copy(
-                points = existing.points + pointsAward,
-                validationsMadeCount = existing.validationsMadeCount + 1,
-                lastUpdated = System.currentTimeMillis()
-            )
-        }
-    }
-
     suspend fun updateDerivedStats(
         userId: String,
         eventsPublishedCount: Int,
@@ -141,21 +112,6 @@ class UserRepository private constructor(
         }
     }
 
-    private suspend fun updateUserStats(
-        userId: String,
-        pushToRemote: Boolean,
-        transform: (User) -> User
-    ) {
-        val normalizedUserId = normalizeUserStatsId(userId)
-        if (normalizedUserId.isBlank()) return
-        val current = userDao.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
-        val updated = transform(current).normalizedForDisplay()
-        userDao.insert(updated)
-        if (pushToRemote) {
-            runCatching { firebase.updateUserProfile(updated) }
-        }
-    }
-
     private fun normalizeUserStatsId(userId: String): String {
         val trimmedId = userId.trim()
         return when {
@@ -164,12 +120,10 @@ class UserRepository private constructor(
         }
     }
 
-    // Check remote Firestore if username is taken (best-effort)
     suspend fun isUsernameTakenRemote(username: String, excludingUserId: String? = null): Boolean {
         return try {
             firebase.isUsernameTaken(username, excludingUserId)
         } catch (_: Exception) {
-            // On any error, be conservative and report it may be taken to avoid duplicates
             true
         }
     }
@@ -189,7 +143,7 @@ class UserRepository private constructor(
                 userDao.insert(user.normalizedForDisplay())
             }
         } catch (_: Exception) {
-            // ignore best-effort sync failures
+            // Ignore sync errors
         }
     }
 

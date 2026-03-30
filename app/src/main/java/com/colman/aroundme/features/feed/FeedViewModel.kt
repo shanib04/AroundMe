@@ -7,15 +7,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.utils.MapCoordinate
+import com.colman.aroundme.utils.distanceKm
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import kotlinx.coroutines.launch
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 private const val DEFAULT_FEED_LOCATION_LABEL = "Kefar Sava"
 
@@ -53,7 +50,6 @@ class FeedViewModel(
     private var sourceEvents: List<Event> = emptyList()
     private var currentSortOption: FeedSortOption = FeedSortOption.NEWEST
     private var currentPageSize: Int = PAGE_SIZE
-    private var isRefreshing = false
     private var isLoadingMore = false
     private var userLocation = DEFAULT_USER_LOCATION
     private var userLocationLabel = DEFAULT_FEED_LOCATION_LABEL
@@ -127,7 +123,7 @@ class FeedViewModel(
             items = visibleItems,
             sortOption = currentSortOption,
             isInitialLoading = isInitialLoading,
-            isRefreshing = isRefreshing,
+            isRefreshing = false,
             isLoadingMore = isLoadingMore,
             hasMore = visibleCount < sorted.size,
             emptyMessage = if (!isInitialLoading && sorted.isEmpty()) "No events to show yet." else "",
@@ -187,19 +183,6 @@ class FeedViewModel(
         } else {
             Long.MAX_VALUE
         }
-    }
-
-    private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
-        val earthRadiusKm = 6371.0
-        val dLat = Math.toRadians(end.latitude - start.latitude)
-        val dLon = Math.toRadians(end.longitude - start.longitude)
-        val lat1 = Math.toRadians(start.latitude)
-        val lat2 = Math.toRadians(end.latitude)
-
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-            sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadiusKm * c
     }
 
     private fun prefetchUsers(events: List<Event>) {

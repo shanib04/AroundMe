@@ -28,7 +28,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentMapBinding
 import com.colman.aroundme.features.feed.EventTextFormatter

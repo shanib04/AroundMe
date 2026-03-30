@@ -41,8 +41,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var userObserver: Observer<User?>? = null
     private var eventObserverSource: LiveData<List<Event>>? = null
     private var eventObserver: Observer<List<Event>>? = null
-    private var allUsersObserverSource: LiveData<List<User>>? = null
-    private var allUsersObserver: Observer<List<User>>? = null
 
     private val _imageUri = MutableLiveData<Uri?>(null)
     val imageUri: LiveData<Uri?> = _imageUri
@@ -217,8 +215,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         userObserver = null
         eventObserverSource = null
         eventObserver = null
-        allUsersObserverSource = null
-        allUsersObserver = null
         currentEvents = emptyList()
         currentUser = null
         knownUsers = emptyList()
@@ -263,22 +259,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             validationsMadeCount = baseUser?.validationsMadeCount ?: 0,
             lastUpdated = maxOf(baseUser?.lastUpdated ?: 0L, System.currentTimeMillis())
         )
-    }
-
-    private fun humanizeUsername(username: String): String {
-        val cleaned = username
-            .replace("[._]+".toRegex(), " ")
-            .replace("\\s+".toRegex(), " ")
-            .trim()
-        if (cleaned.isBlank()) return ""
-
-        return cleaned.split(' ')
-            .filter(String::isNotBlank)
-            .joinToString(" ") { part ->
-                part.replaceFirstChar { char ->
-                    if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
-                }
-            }
     }
 
     private fun postUser(user: User?) {

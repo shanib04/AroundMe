@@ -107,7 +107,7 @@ class CreateEventViewModel(
         }
     }
 
-    fun createEvent(
+    private fun createEvent(
         title: String,
         description: String,
         locationName: String,

@@ -9,7 +9,6 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
-/// Simple Firebase manager to abstract away direct Firebase calls from repositories
 class FirebaseModel private constructor() {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -137,7 +136,6 @@ class FirebaseModel private constructor() {
             .await()
     }
 
-    // Check if a username exists in Firestore (excluding a specific userId)
     suspend fun isUsernameTaken(username: String, excludingUserId: String? = null): Boolean {
         return try {
             val docs = firestore.collection(USERS_COLLECTION).whereEqualTo("username", username).get().await().documents
@@ -151,7 +149,6 @@ class FirebaseModel private constructor() {
         }
     }
 
-    // Delete a user and all events published by that user from Firestore
     suspend fun deleteUserAndEventsStrict(userId: String) {
         firestore.collection(USERS_COLLECTION).document(userId).delete().await()
         val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()

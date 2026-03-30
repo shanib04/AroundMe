@@ -21,7 +21,6 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-// Repository pattern for Event data
 class EventRepository private constructor(
     private val eventDao: EventDao,
     private val eventInteractionDao: EventInteractionDao,
@@ -31,8 +30,6 @@ class EventRepository private constructor(
     private val userRepository: UserRepository,
     private val achievementRepository: AchievementRepository
 ) {
-
-    init {}
 
     // Primary events feed: sourced from Firebase (Firestore). Room is a best-effort cache.
     fun observeAll(): Flow<List<Event>> = callbackFlow {
@@ -62,15 +59,11 @@ class EventRepository private constructor(
     // Compatibility method for existing UI code
     fun getEvents(): Flow<List<Event>> = observeAll()
 
-    // For places where we need a one-shot fetch (e.g., background sync)
-    suspend fun fetchAllOnce(): List<Event> = firebase.fetchEventsSince(0L)
-
     fun getById(id: String) = eventDao.getById(id)
 
     // Compatibility method name used by older viewmodels/fragments
     fun getEventById(id: String) = getById(id)
 
-    // Observe events for a specific publisher (LiveData from Room)
     fun observeEventsByPublisher(pubId: String) = eventDao.getEventsByPublisher(pubId)
 
     // Real-time event details from Firestore.
@@ -513,10 +506,6 @@ class EventRepository private constructor(
         private const val USERS_COLLECTION = "Users"
         private const val VOTES_SUBCOLLECTION = "votes"
         private const val RATINGS_SUBCOLLECTION = "ratings"
-        private const val ACTIVE_VOTES_FIELD = "activeVotes"
-        private const val INACTIVE_VOTES_FIELD = "inactiveVotes"
-        private const val AVERAGE_RATING_FIELD = "averageRating"
-        private const val RATING_COUNT_FIELD = "ratingCount"
         private const val RATING_FIELD = "rating"
         private const val UPDATED_AT_FIELD = "lastUpdated"
         private const val VOTE_TYPE_FIELD = "voteType"

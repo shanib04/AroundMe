@@ -1,9 +1,9 @@
 package com.colman.aroundme.data.repository
 
 import android.app.Application
-import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
@@ -16,8 +16,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
-import java.io.File
-import java.io.FileOutputStream
 
 class AuthRepository(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -36,14 +34,6 @@ class AuthRepository(
 
     fun logout() {
         firebaseAuth.signOut()
-    }
-
-    suspend fun loginWithEmailAndPassword(
-        email: String,
-        password: String
-    ): Result<FirebaseUser> = runCatching {
-        val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-        authResult.user ?: error("Login succeeded, but no user data was returned.")
     }
 
     suspend fun loginWithGoogle(idToken: String): Result<FirebaseUser> = runCatching {
@@ -258,23 +248,6 @@ class AuthRepository(
         return firebaseAuth.currentUser ?: this
     }
 
-    private fun copyImageToAppStorage(sourceUri: Uri, userId: String): Uri {
-        if (sourceUri.scheme == ContentResolver.SCHEME_FILE) {
-            return sourceUri
-        }
-
-        val inputStream = appContext.contentResolver.openInputStream(sourceUri)
-            ?: error("Unable to open the selected profile image.")
-        val imageFile = File(appContext.cacheDir, "profile_upload_$userId.jpg")
-        inputStream.use { input ->
-            FileOutputStream(imageFile).use { output ->
-                input.copyTo(output)
-                output.flush()
-            }
-        }
-        return Uri.fromFile(imageFile)
-    }
-
     private fun buildFallbackUser(user: FirebaseUser, fallbackImageUrl: String? = null): User =
         User(
             id = user.uid,
@@ -299,8 +272,6 @@ class AuthRepository(
             validationsMadeCount = primary?.validationsMadeCount ?: fallback.validationsMadeCount,
             lastUpdated = maxOf(primary?.lastUpdated ?: 0L, fallback.lastUpdated)
         )
-
-    private fun String.toUri(): Uri = Uri.parse(this)
 
 
     private companion object {

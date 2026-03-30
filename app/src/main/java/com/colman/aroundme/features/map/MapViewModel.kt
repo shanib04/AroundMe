@@ -9,16 +9,13 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.map
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.utils.MapCoordinate
+import com.colman.aroundme.utils.distanceKm
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.features.feed.EventTextFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 data class MapFeaturedEventItem(
     val event: Event,
@@ -179,19 +176,6 @@ class MapViewModel(
         }
     }
 
-    private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
-        val earthRadiusKm = 6371.0
-        val dLat = Math.toRadians(end.latitude - start.latitude)
-        val dLon = Math.toRadians(end.longitude - start.longitude)
-        val lat1 = Math.toRadians(start.latitude)
-        val lat2 = Math.toRadians(end.latitude)
-
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-            sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadiusKm * c
-    }
-
     private fun formatCoordinate(center: MapCoordinate): String {
         return "${"%.4f".format(center.latitude)}, ${"%.4f".format(center.longitude)}"
     }
@@ -208,7 +192,6 @@ class MapViewModel(
 
     companion object {
         val KEFAR_SAVA_CENTER = MapCoordinate(32.1782, 34.9076)
-        val JERUSALEM_CENTER = MapCoordinate(31.7780, 35.2217)
         val DEFAULT_SEARCH_CENTER = KEFAR_SAVA_CENTER
         const val DEFAULT_SEARCH_LABEL = "Kefar Sava"
         const val DEFAULT_RADIUS_KM = 25f
