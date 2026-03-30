@@ -50,8 +50,8 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun awardEventCreated(userId: String, pointsAward: Int = 10) {
-        updateUserStats(userId) { existing ->
+    suspend fun awardEventCreated(userId: String, pointsAward: Int = 10, pushToRemote: Boolean = true) {
+        updateUserStats(userId, pushToRemote) { existing ->
             existing.copy(
                 points = existing.points + pointsAward,
                 eventsPublishedCount = existing.eventsPublishedCount + 1,
@@ -60,8 +60,8 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun awardValidation(userId: String, pointsAward: Int = 2) {
-        updateUserStats(userId) { existing ->
+    suspend fun awardValidation(userId: String, pointsAward: Int = 2, pushToRemote: Boolean = true) {
+        updateUserStats(userId, pushToRemote) { existing ->
             existing.copy(
                 points = existing.points + pointsAward,
                 validationsMadeCount = existing.validationsMadeCount + 1,
@@ -70,13 +70,49 @@ class UserRepository private constructor(
         }
     }
 
-    private suspend fun updateUserStats(userId: String, transform: (User) -> User) {
+    suspend fun updateDerivedStats(
+        userId: String,
+        eventsPublishedCount: Int,
+        validationsMadeCount: Int,
+        points: Int
+    ) {
+        val normalizedUserId = normalizeUserStatsId(userId)
+        if (normalizedUserId.isBlank()) return
+
+        val now = System.currentTimeMillis()
+        val current = userDao.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val updated = current.copy(
+            points = points,
+            eventsPublishedCount = eventsPublishedCount,
+            validationsMadeCount = validationsMadeCount,
+            lastUpdated = now
+        ).normalizedForDisplay()
+
+        userDao.insert(updated)
+        runCatching {
+            firebase.updateUserDerivedStats(
+                userId = normalizedUserId,
+                points = points,
+                eventsPublishedCount = eventsPublishedCount,
+                validationsMadeCount = validationsMadeCount,
+                lastUpdated = now
+            )
+        }
+    }
+
+    private suspend fun updateUserStats(
+        userId: String,
+        pushToRemote: Boolean,
+        transform: (User) -> User
+    ) {
         val normalizedUserId = normalizeUserStatsId(userId)
         if (normalizedUserId.isBlank()) return
         val current = userDao.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
         val updated = transform(current).normalizedForDisplay()
         userDao.insert(updated)
-        runCatching { firebase.updateUserProfile(updated) }
+        if (pushToRemote) {
+            runCatching { firebase.updateUserProfile(updated) }
+        }
     }
 
     private fun normalizeUserStatsId(userId: String): String {

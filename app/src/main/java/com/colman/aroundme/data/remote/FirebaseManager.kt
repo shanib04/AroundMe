@@ -117,6 +117,26 @@ class FirebaseModel private constructor() {
             ).await()
     }
 
+    suspend fun updateUserDerivedStats(
+        userId: String,
+        points: Int,
+        eventsPublishedCount: Int,
+        validationsMadeCount: Int,
+        lastUpdated: Long
+    ) {
+        firestore.collection(USERS_COLLECTION).document(userId)
+            .set(
+                mapOf(
+                    "points" to points,
+                    "eventsPublishedCount" to eventsPublishedCount,
+                    "validationsMadeCount" to validationsMadeCount,
+                    "lastUpdated" to lastUpdated
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
     // Check if a username exists in Firestore (excluding a specific userId)
     suspend fun isUsernameTaken(username: String, excludingUserId: String? = null): Boolean {
         return try {

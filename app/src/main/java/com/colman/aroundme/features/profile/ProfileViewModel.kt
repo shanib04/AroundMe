@@ -310,7 +310,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             val realEventCount = events.size
             val safeUser = (user ?: authFallbackUser()) ?: User(id = requestedUserId)
             val realValidations = maxOf(safeUser.validationsMadeCount, derivedValidations)
-            val points = safeUser.points
+            val expectedPoints = (realEventCount * EVENT_CREATED_POINTS) + (realValidations * VALIDATION_POINTS)
+            val points = maxOf(safeUser.points, expectedPoints)
             val totalActiveVotes = events.sumOf { it.activeVotes }
             val totalInactiveVotes = events.sumOf { it.inactiveVotes }
             val isReliableContributor = realEventCount > 0 && totalActiveVotes > 0 && totalInactiveVotes == 0
@@ -334,21 +335,33 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _achievements.postValue(history.take(3))
 
             val statsChanged = safeUser.eventsPublishedCount != realEventCount ||
-                safeUser.validationsMadeCount != realValidations
+                safeUser.validationsMadeCount != realValidations ||
+                safeUser.points != points
 
             if (safeUser.id.isNotBlank() && statsChanged) {
                 val updatedUser = safeUser.copy(
+                    points = points,
                     eventsPublishedCount = realEventCount,
                     validationsMadeCount = realValidations,
                     lastUpdated = System.currentTimeMillis()
                 )
                 currentUser = updatedUser
-                runCatching { userRepo.updateUserProfile(updatedUser, pushToRemote = true) }
+                runCatching {
+                    userRepo.updateDerivedStats(
+                        userId = updatedUser.id,
+                        eventsPublishedCount = realEventCount,
+                        validationsMadeCount = realValidations,
+                        points = points
+                    )
+                }
             }
         }
     }
 
     companion object {
+        private const val EVENT_CREATED_POINTS = 10
+        private const val VALIDATION_POINTS = 2
+
         internal data class LevelProgress(
             val level: Int,
             val nextLevel: Int,

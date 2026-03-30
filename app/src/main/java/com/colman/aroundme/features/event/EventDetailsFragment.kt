@@ -22,7 +22,6 @@ import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
-import com.colman.aroundme.data.repository.EventDetailsRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -42,7 +41,6 @@ class EventDetailsFragment : Fragment() {
         EventDetailsViewModel.Factory(
             eventId = args.eventId,
             eventRepository = EventRepository.getInstance(requireContext()),
-            eventDetailsRepository = EventDetailsRepository.getInstance(),
             userRepository = UserRepository.getInstance(requireContext()),
             placesRepository = PlacesRepository.getInstance(),
             firebaseModel = FirebaseModel.getInstance()
