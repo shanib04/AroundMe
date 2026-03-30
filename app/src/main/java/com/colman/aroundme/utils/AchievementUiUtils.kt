@@ -1,4 +1,4 @@
-package com.colman.aroundme.features.profile
+package com.colman.aroundme.utils
 
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement

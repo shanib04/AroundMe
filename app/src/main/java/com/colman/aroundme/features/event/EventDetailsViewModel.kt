@@ -55,7 +55,6 @@ class EventDetailsViewModel(
     val nearbyPlaces: LiveData<List<NearbyPlace>> = _nearbyPlaces
 
     private val _nearbyError = MutableLiveData<String?>(null)
-    val nearbyError: LiveData<String?> = _nearbyError
 
     private val _selectedEssentialsType = MutableLiveData(EssentialsType.PARKING)
     val selectedEssentialsType: LiveData<EssentialsType> = _selectedEssentialsType

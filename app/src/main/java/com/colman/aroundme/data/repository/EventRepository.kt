@@ -29,11 +29,7 @@ class EventRepository private constructor(
     private val achievementRepository: AchievementRepository
 ) {
 
-    // Rule 1: Room is the single source of truth. UI observes Room; Firebase syncs into Room.
     fun observeAll(): Flow<List<Event>> = eventDao.observeAll()
-
-    // Compatibility method for existing UI code
-    fun getEvents(): Flow<List<Event>> = observeAll()
 
     fun getById(id: String) = eventDao.getById(id)
 
@@ -75,11 +71,6 @@ class EventRepository private constructor(
                     events.forEach { eventDao.insert(it) }
                 }
             }
-    }
-
-    fun stopEventsRealtimeSync() {
-        eventsListListener?.remove()
-        eventsListListener = null
     }
 
     suspend fun upsertEvent(event: Event, pushToRemote: Boolean = true) {
@@ -331,12 +322,6 @@ class EventRepository private constructor(
         return updatedInteraction
     }
 
-    fun syncFromRemote(since: Long = 0L) {
-        CoroutineScope(Dispatchers.IO).launch {
-            syncFromRemoteNow(since)
-        }
-    }
-
     suspend fun syncFromRemoteNow(since: Long = 0L) {
         try {
             val remote = firebase.fetchEventsSince(since)
@@ -379,9 +364,6 @@ class EventRepository private constructor(
         }
     }
 
-    fun observeInteraction(eventId: String) =
-        eventInteractionDao.observeInteraction(eventId, identityRepository.getAuthenticatedUserIdOrNull().orEmpty())
-
     suspend fun refreshMyInteraction(eventId: String): EventInteraction? {
         val userId = identityRepository.awaitAuthenticatedUserId() ?: return null
 
@@ -421,40 +403,6 @@ class EventRepository private constructor(
         )
         eventInteractionDao.upsert(refreshedInteraction)
         return refreshedInteraction
-    }
-
-    suspend fun getInteraction(eventId: String): EventInteraction? {
-        val userId = identityRepository.getAuthenticatedUserIdOrNull() ?: return null
-        return eventInteractionDao.getInteraction(eventId, userId)
-    }
-
-    private suspend fun recalculateEventAggregates(
-        event: Event,
-        pushToRemote: Boolean = true
-    ): Event {
-        val interactions = eventInteractionDao.getInteractionsForEvent(event.id)
-        val activeVotes = interactions.count { it.voteType == EventVoteType.ACTIVE }
-        val inactiveVotes = interactions.count { it.voteType == EventVoteType.INACTIVE }
-        val ratings = interactions.map { it.rating }.filter { it > 0 }
-
-        val updatedEvent = event.copy(
-            activeVotes = activeVotes,
-            inactiveVotes = inactiveVotes,
-            averageRating = calculateAverageRating(ratings),
-            ratingCount = ratings.size,
-            lastUpdated = System.currentTimeMillis()
-        )
-
-        eventDao.insert(updatedEvent)
-        if (pushToRemote) {
-            try {
-                firebase.pushEvent(updatedEvent)
-            } catch (e: Exception) {
-                Log.e(TAG, "recalculateEventAggregates remote sync failed", e)
-            }
-        }
-        achievementRepository.unlockForPublisherEventState(updatedEvent)
-        return updatedEvent
     }
 
     internal fun calculateAverageRating(ratings: List<Int>): Double {

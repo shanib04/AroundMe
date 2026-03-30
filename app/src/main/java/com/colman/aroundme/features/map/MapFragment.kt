@@ -31,7 +31,6 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentMapBinding
-import com.colman.aroundme.features.feed.EventTextFormatter
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory

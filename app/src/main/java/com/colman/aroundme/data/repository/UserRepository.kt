@@ -82,6 +82,14 @@ class UserRepository private constructor(
         }
     }
 
+    suspend fun updateUserAchievements(user: User, pushToRemote: Boolean = true) {
+        val normalized = user.normalizedForDisplay()
+        userDao.insert(normalized)
+        if (pushToRemote) {
+            firebase.updateUserAchievements(normalized)
+        }
+    }
+
     suspend fun updateDerivedStats(
         userId: String,
         eventsPublishedCount: Int,
@@ -128,14 +136,6 @@ class UserRepository private constructor(
         }
     }
 
-    suspend fun deleteUser(id: String) {
-        userDao.deleteById(id)
-    }
-
-    suspend fun clearAllLocal() {
-        userDao.deleteAll()
-    }
-
     suspend fun syncFromRemoteNow(since: Long = 0L) {
         try {
             val remote = firebase.fetchUsersSince(since)
@@ -144,12 +144,6 @@ class UserRepository private constructor(
             }
         } catch (_: Exception) {
             // Ignore sync errors
-        }
-    }
-
-    fun syncFromRemote(since: Long = 0L) {
-        CoroutineScope(Dispatchers.IO).launch {
-            syncFromRemoteNow(since)
         }
     }
 

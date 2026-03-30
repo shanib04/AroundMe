@@ -105,11 +105,18 @@ class FirebaseModel private constructor() {
                     "displayName" to user.displayName,
                     "profileImageUrl" to user.profileImageUrl,
                     "email" to user.email,
-                    "achievementHistory" to user.achievementHistory,
                     "discoveryRadiusKm" to user.discoveryRadiusKm,
-                    "points" to user.points,
-                    "eventsPublishedCount" to user.eventsPublishedCount,
-                    "validationsMadeCount" to user.validationsMadeCount,
+                    "lastUpdated" to user.lastUpdated
+                ),
+                SetOptions.merge()
+            ).await()
+    }
+
+    suspend fun updateUserAchievements(user: User) {
+        firestore.collection(USERS_COLLECTION).document(user.id)
+            .set(
+                mapOf(
+                    "achievementHistory" to user.achievementHistory,
                     "lastUpdated" to user.lastUpdated
                 ),
                 SetOptions.merge()
@@ -170,18 +177,6 @@ class FirebaseModel private constructor() {
             .document(eventId)
             .delete()
             .await()
-    }
-
-    suspend fun fetchAllUsers(): List<User> {
-        return try {
-            firestore.collection(USERS_COLLECTION)
-                .get()
-                .await()
-                .documents
-                .mapNotNull { it.toObject(User::class.java) }
-        } catch (_: FirebaseFirestoreException) {
-            emptyList()
-        }
     }
 
     suspend fun fetchUsersSince(since: Long): List<User> {

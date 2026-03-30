@@ -20,9 +20,7 @@ class LoginViewModel(
     private val userRepository = UserRepository.getInstance(application)
 
     private val credentialsRequiredMessage = getString(R.string.error_login_credentials_required)
-    private val loginFailedMessage = getString(R.string.error_login_failed)
     private val googleTokenMissingMessage = getString(R.string.error_login_google_token_missing)
-    private val googleLoginFailedMessage = getString(R.string.error_login_google_failed)
 
     private val _loginState = MutableLiveData<AuthResultState>(AuthResultState.Idle)
     val loginState: LiveData<AuthResultState> = _loginState

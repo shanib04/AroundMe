@@ -24,7 +24,7 @@ import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentCreateEventBinding
 import com.firebase.geofire.GeoFireUtils
@@ -308,7 +308,7 @@ class CreateEventFragment : Fragment() {
             } ?: run {
                 Toast.makeText(context, "Unable to open camera", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(context, "Error creating image file", Toast.LENGTH_SHORT).show()
         }
     }
@@ -539,7 +539,7 @@ class CreateEventFragment : Fragment() {
                         selectedLocationName = "Current Location"
                         binding.tvLocationName.text = selectedLocationName
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     selectedLocationName = "Current Location"
                     binding.tvLocationName.text = selectedLocationName
                 }

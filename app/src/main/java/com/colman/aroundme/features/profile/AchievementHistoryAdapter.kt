@@ -6,9 +6,10 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.ItemAchievementHistoryBinding
+import com.colman.aroundme.utils.backgroundForAchievement
 
 class AchievementHistoryAdapter : ListAdapter<Achievement, AchievementHistoryAdapter.HistoryViewHolder>(DiffCallback) {
 

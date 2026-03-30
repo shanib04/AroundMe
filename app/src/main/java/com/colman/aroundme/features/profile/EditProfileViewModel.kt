@@ -17,6 +17,7 @@ import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
+import com.colman.aroundme.utils.humanizeUsername
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

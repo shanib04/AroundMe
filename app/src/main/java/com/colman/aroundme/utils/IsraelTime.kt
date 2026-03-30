@@ -1,4 +1,4 @@
-package com.colman.aroundme.core.time
+package com.colman.aroundme.utils
 
 import java.text.SimpleDateFormat
 import java.util.Calendar

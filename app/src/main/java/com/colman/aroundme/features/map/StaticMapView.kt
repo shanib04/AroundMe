@@ -63,25 +63,6 @@ class StaticMapView @JvmOverloads constructor(
     private var lastTouchY = 0f
     private var isPanning = false
 
-    val currentCenter: MapCoordinate
-        get() = searchCenter
-
-    fun updateState(
-        events: List<Event>,
-        searchCenter: MapCoordinate,
-        selectedEventId: String?
-    ) {
-        this.events = events
-        this.searchCenter = searchCenter
-        this.selectedEventId = selectedEventId
-        invalidate()
-    }
-
-    fun animateToCenter(center: MapCoordinate) {
-        searchCenter = center
-        invalidate()
-    }
-
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)

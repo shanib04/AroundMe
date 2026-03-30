@@ -31,7 +31,7 @@ class AchievementRepository private constructor(
             )).sortedByDescending { it.unlockedAt },
             lastUpdated = now
         )
-        userRepository.updateUserProfile(updatedUser, pushToRemote = true)
+        userRepository.updateUserAchievements(updatedUser, pushToRemote = true)
     }
 
     suspend fun unlockForCreatedEvent(userId: String) {
@@ -169,7 +169,7 @@ class AchievementRepository private constructor(
             achievementHistory = mergedHistory,
             lastUpdated = now
         )
-        userRepository.updateUserProfile(updatedUser, pushToRemote = true)
+        userRepository.updateUserAchievements(updatedUser, pushToRemote = true)
     }
 
     private fun buildEventDrivenAchievements(event: Event): List<Achievement> = buildList {

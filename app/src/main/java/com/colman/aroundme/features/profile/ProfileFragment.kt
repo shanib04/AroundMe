@@ -20,6 +20,7 @@ import com.bumptech.glide.request.target.Target
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.FragmentProfileBinding
+import com.colman.aroundme.utils.backgroundForAchievement
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import java.text.NumberFormat

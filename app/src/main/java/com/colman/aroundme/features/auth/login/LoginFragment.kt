@@ -29,7 +29,6 @@ import kotlinx.coroutines.launch
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = requireNotNull(_binding) { "FragmentLoginBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: LoginViewModel by viewModels {
         LoginViewModel.Factory(requireActivity().application)

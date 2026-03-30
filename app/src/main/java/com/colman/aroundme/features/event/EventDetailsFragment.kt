@@ -16,7 +16,7 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
@@ -27,7 +27,6 @@ import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentEventDetailsBinding
-import java.util.Date
 import java.util.Locale
 
 class EventDetailsFragment : Fragment() {

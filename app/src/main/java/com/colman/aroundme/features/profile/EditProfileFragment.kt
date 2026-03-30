@@ -15,7 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.core.widget.addTextChangedListener
 import androidx.navigation.fragment.findNavController
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.bumptech.glide.Glide
 import com.colman.aroundme.databinding.FragmentEditProfileBinding
 import com.google.android.material.snackbar.Snackbar

@@ -58,7 +58,6 @@ class MainActivity : AppCompatActivity() {
         // Let NavigationUI handle normal selection for tabs
         binding.bottomNavigationView.setupWithNavController(navController)
 
-        // Prevent double-tap re-navigation to the same destination
         binding.bottomNavigationView.setOnItemReselectedListener {}
 
         binding.fabAdd.setOnClickListener {
@@ -87,12 +86,10 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     R.id.createEventFragment -> {
-                        // FAB-only screen: clear all tab selection
                         for (i in 0 until menu.size()) {
                             menu.getItem(i).isChecked = false
                         }
                     }
-                    // For map/profile, setupWithNavController will handle selection
                 }
             }
         }

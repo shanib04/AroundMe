@@ -38,7 +38,6 @@ class MapViewModel(
     private val _timeTick = MutableLiveData(System.currentTimeMillis())
 
     private val _isLoading = MutableLiveData(true)
-    val isLoading: LiveData<Boolean> = _isLoading
 
     // Expose a snapshot of active events for global event search.
     fun allEventsSnapshot(): List<Event> = activeEvents(allEvents.value.orEmpty())
@@ -50,10 +49,8 @@ class MapViewModel(
     val selectedFilters: LiveData<Set<String>> = _selectedFilters
 
     private val _radiusKm = MutableLiveData(initialRadiusKm)
-    val radiusKm: LiveData<Float> = _radiusKm
 
     private val _searchCenter = MutableLiveData<MapCoordinate>(DEFAULT_SEARCH_CENTER)
-    val searchCenter: LiveData<MapCoordinate> = _searchCenter
 
     private val _searchLocationLabel = MutableLiveData(DEFAULT_SEARCH_LABEL)
     val searchLocationLabel: LiveData<String> = _searchLocationLabel

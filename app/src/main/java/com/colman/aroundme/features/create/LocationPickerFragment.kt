@@ -158,7 +158,7 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
             } else {
                 Toast.makeText(context, "Location not found", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(context, "Error searching location", Toast.LENGTH_SHORT).show()
         }
     }
@@ -232,7 +232,7 @@ class LocationPickerFragment : Fragment(), OnMapReadyCallback {
             } else {
                 binding.tvSelectedAddress.text = "Unknown Location"
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             binding.tvSelectedAddress.text = "Fetching address..."
         }
     }

@@ -6,7 +6,6 @@ import com.colman.aroundme.R
 import com.google.android.material.chip.Chip
 import com.google.android.material.shape.CornerFamily
 
-/** Creates the premium tag pill used in EventDetails (#FOOD, etc.). */
 object EventTagChipBuilder {
 
     fun create(context: Context, rawTag: String): Chip {
@@ -20,7 +19,6 @@ object EventTagChipBuilder {
             chipBackgroundColor = ColorStateList.valueOf(context.getColor(R.color.ds_primary_10))
             chipStrokeWidth = 0f
 
-            // Force fully rounded "pill" appearance.
             shapeAppearanceModel = shapeAppearanceModel.toBuilder()
                 .setAllCorners(CornerFamily.ROUNDED, 999f)
                 .build()

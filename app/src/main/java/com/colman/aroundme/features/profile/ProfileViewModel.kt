@@ -19,6 +19,7 @@ import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
+import com.colman.aroundme.utils.humanizeUsername
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -77,7 +78,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val progressText: LiveData<String> = _progressText
 
     private val _achievements = MutableLiveData<List<Achievement>>(emptyList())
-    val achievements: LiveData<List<Achievement>> = _achievements
 
     private val _achievementHistory = MutableLiveData<List<Achievement>>(emptyList())
     val achievementHistory: LiveData<List<Achievement>> = _achievementHistory

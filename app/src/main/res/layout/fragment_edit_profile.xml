@@ -321,6 +321,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
+            android:indeterminate="true"
             app:indicatorColor="@color/map_navy"
             app:trackColor="@color/surface_container_high"
             app:trackThickness="4dp" />
