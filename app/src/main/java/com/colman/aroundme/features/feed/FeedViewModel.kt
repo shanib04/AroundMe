@@ -22,7 +22,7 @@ data class FeedEventItem(
 
 data class FeedUiState(
     val items: List<FeedEventItem> = emptyList(),
-    val sortOption: FeedSortOption = FeedSortOption.NEWEST,
+    val sortOption: FeedSortOption = FeedSortOption.DISTANCE,
     val isInitialLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val isLoadingMore: Boolean = false,
@@ -48,7 +48,7 @@ class FeedViewModel(
     private val uiStateSource = MediatorLiveData<FeedUiState>()
 
     private var sourceEvents: List<Event> = emptyList()
-    private var currentSortOption: FeedSortOption = FeedSortOption.NEWEST
+    private var currentSortOption: FeedSortOption = FeedSortOption.DISTANCE
     private var currentPageSize: Int = PAGE_SIZE
     private var isLoadingMore = false
     private var userLocation = DEFAULT_USER_LOCATION

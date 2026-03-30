@@ -56,6 +56,10 @@ class MyEventsViewModel(
             usersById = users.associateBy { it.id }
             publishItems()
         }
+        // Ensure events are synced from remote on first load
+        viewModelScope.launch {
+            runCatching { repository.syncFromRemoteNow(0L) }
+        }
     }
 
     private fun publishItems() {

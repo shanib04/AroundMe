@@ -90,6 +90,15 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadUser(userId: String) {
+        // Clear stale data from a previous user session immediately
+        if (loadedUser != null && loadedUser?.id != userId) {
+            loadedUser = null
+            _email.postValue("")
+            _username.postValue("")
+            _displayName.postValue("")
+            _imageUri.postValue(null)
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
             _loading.postValue(true)
             val localUser = runCatching { userRepo.getUserById(userId).first() }.getOrNull()

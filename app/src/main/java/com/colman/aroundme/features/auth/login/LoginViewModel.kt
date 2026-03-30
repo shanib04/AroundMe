@@ -40,10 +40,8 @@ class LoginViewModel(
                     bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
-                .onFailure { throwable ->
-                    _loginState.value = AuthResultState.Error(
-                        throwable.localizedMessage ?: loginFailedMessage
-                    )
+                .onFailure {
+                    _loginState.value = AuthResultState.Error(loginFailedMessage)
                 }
         }
     }

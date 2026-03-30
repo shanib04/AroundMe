@@ -59,6 +59,7 @@ class EventDetailsFragment : Fragment() {
         get() = binding.root.findViewById(R.id.eventTimeSecondary)
 
     private var suppressRatingListener = false
+    private var lastRenderedPublisherImageUrl: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -238,12 +239,16 @@ class EventDetailsFragment : Fragment() {
         binding.publisherHandle.text = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
         binding.publisherHandle.isVisible = !binding.publisherHandle.text.isNullOrBlank()
 
-        Glide.with(this)
-            .load(user?.versionedProfileImageUrl()?.ifBlank { null })
-            .placeholder(R.drawable.ic_person_placeholder)
-            .error(R.drawable.ic_person_placeholder)
-            .centerCrop()
-            .into(binding.publisherAvatar)
+        val imageUrl = user?.versionedProfileImageUrl()?.ifBlank { null }
+        if (imageUrl != lastRenderedPublisherImageUrl) {
+            lastRenderedPublisherImageUrl = imageUrl
+            Glide.with(this)
+                .load(imageUrl)
+                .placeholder(R.drawable.ic_person_placeholder)
+                .error(R.drawable.ic_person_placeholder)
+                .centerCrop()
+                .into(binding.publisherAvatar)
+        }
     }
 
     private fun renderVoteSelection(selectedVoteType: EventVoteType?) {

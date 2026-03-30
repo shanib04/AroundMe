@@ -77,7 +77,7 @@ class FeedFragment : Fragment() {
     }
 
     private var lastHandledScrollToTopToken: Long = 0L
-    private var selectedSortOption: FeedSortOption = FeedSortOption.NEWEST
+    private var selectedSortOption: FeedSortOption = FeedSortOption.DISTANCE
 
     override fun onCreateView(
         inflater: LayoutInflater,

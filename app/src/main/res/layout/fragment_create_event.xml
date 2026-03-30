@@ -578,11 +578,12 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <ProgressBar
+        <com.google.android.material.progressindicator.CircularProgressIndicator
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:indeterminateTint="@color/primary_coral" />
+            android:indeterminate="true"
+            app:indicatorColor="@color/primary_coral" />
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

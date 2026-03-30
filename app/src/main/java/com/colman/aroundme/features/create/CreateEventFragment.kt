@@ -31,6 +31,8 @@ import com.firebase.geofire.GeoFireUtils
 import com.firebase.geofire.GeoLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
@@ -512,10 +514,13 @@ class CreateEventFragment : Fragment() {
     }
 
     @SuppressLint("MissingPermission")
-    @Suppress("DEPRECATION")
     private fun getCurrentLocation() {
         binding.tvLocationName.text = "Getting location..."
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+        val cancellationTokenSource = CancellationTokenSource()
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            cancellationTokenSource.token
+        ).addOnSuccessListener { location ->
             if (location != null) {
                 selectedLatitude = location.latitude
                 selectedLongitude = location.longitude

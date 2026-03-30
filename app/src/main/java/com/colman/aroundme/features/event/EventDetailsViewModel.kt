@@ -73,6 +73,7 @@ class EventDetailsViewModel(
     val errorMessage: LiveData<String?> = _errorMessage
 
     private var eventJob: Job? = null
+    private var resolvedPublisherId: String? = null
 
     init {
         observeEventRealtime()
@@ -91,18 +92,26 @@ class EventDetailsViewModel(
     private fun observeEventRealtime() {
         eventJob?.cancel()
         eventJob = viewModelScope.launch {
-            eventRepository.getEventDetails(eventId).collectLatest { e ->
-                _event.value = e
-                e?.let { ev ->
-                    val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
-                    val refreshedPublisher = userRepository.refreshUserFromRemoteNow(ev.publisherId)
-                    _publisher.value = refreshedPublisher ?: roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
-                    _screenLoading.value = false
+            try {
+                eventRepository.getEventDetails(eventId).collectLatest { e ->
+                    _event.value = e
+                    e?.let { ev ->
+                        // Only fetch publisher once (or when publisherId changes)
+                        if (resolvedPublisherId != ev.publisherId) {
+                            resolvedPublisherId = ev.publisherId
+                            val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
+                            val refreshedPublisher = userRepository.refreshUserFromRemoteNow(ev.publisherId)
+                            _publisher.value = refreshedPublisher ?: roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+                        }
+                        _screenLoading.value = false
 
-                    if (ev.latitude != 0.0 && ev.longitude != 0.0) {
-                        loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)
+                        if (ev.latitude != 0.0 && ev.longitude != 0.0) {
+                            loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)
+                        }
                     }
                 }
+            } finally {
+                _screenLoading.value = false
             }
         }
     }
