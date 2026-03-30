@@ -111,7 +111,7 @@ class EditProfileFragment : Fragment() {
                         null,
                         androidx.navigation.NavOptions.Builder()
                             .setLaunchSingleTop(true)
-                            .setPopUpTo(R.id.loginFragment, true)
+                            .setPopUpTo(R.id.nav_graph, true)
                             .build()
                     )
                 }

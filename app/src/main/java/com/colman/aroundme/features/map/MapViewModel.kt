@@ -12,8 +12,12 @@ import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.utils.distanceKm
 import com.colman.aroundme.data.repository.EventRepository
+import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.features.feed.EventTextFormatter
+import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -26,6 +30,7 @@ data class MapFeaturedEventItem(
 
 class MapViewModel(
     private val repository: EventRepository,
+    private val userRepository: UserRepository,
     initialRadiusKm: Float = DEFAULT_RADIUS_KM
 ) : ViewModel() {
 
@@ -125,6 +130,24 @@ class MapViewModel(
 
     fun selectEvent(eventId: String?) { _selectedEventId.value = eventId }
 
+    private val _savedRadius = MutableLiveData<Float?>(null)
+    val savedRadius: LiveData<Float?> = _savedRadius
+
+    fun bootstrapSavedRadius() {
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        if (currentUserId.isBlank()) {
+            _savedRadius.postValue(15f)
+            return
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            userRepository.refreshUserFromRemote(currentUserId)
+            val radius = runCatching {
+                userRepository.getUserById(currentUserId).first()?.discoveryRadiusKm?.toFloat()
+            }.getOrNull() ?: DEFAULT_RADIUS_KM
+            _savedRadius.postValue(radius)
+        }
+    }
+
     fun distanceFromCenterKm(event: Event): Double {
         return distanceKm(_searchCenter.value ?: DEFAULT_SEARCH_CENTER,
             MapCoordinate(event.latitude, event.longitude)
@@ -186,11 +209,12 @@ class MapViewModel(
 
     class Factory(
         private val repository: EventRepository,
+        private val userRepository: UserRepository,
         private val initialRadiusKm: Float = DEFAULT_RADIUS_KM
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return MapViewModel(repository, initialRadiusKm) as T
+            return MapViewModel(repository, userRepository, initialRadiusKm) as T
         }
     }
 

@@ -11,6 +11,7 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.R
+import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
@@ -189,7 +190,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             try {
                 clearObserversOnMainThread()
                 authRepo.logout()
-                userRepo.clearAllLocal()
+                // Clear ALL Room tables for secure logout
+                AppLocalDb.getInstance(getApplication()).clearAllTables()
                 _logoutState.postValue(LogoutState.Success)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "logout failed", e)

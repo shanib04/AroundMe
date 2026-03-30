@@ -121,7 +121,7 @@ class ProfileFragment : Fragment() {
                         null,
                         NavOptions.Builder()
                             .setLaunchSingleTop(true)
-                            .setPopUpTo(R.id.loginFragment, true)
+                            .setPopUpTo(R.id.nav_graph, true)
                             .build()
                     )
                 }

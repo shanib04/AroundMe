@@ -9,6 +9,7 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.R
+import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.remote.FirebaseModel
@@ -215,7 +216,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 authRepo.deleteCurrentUserAccountAndData(firebase ?: FirebaseModel.getInstance())
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = false)
-                userRepo.clearAllLocal()
+                AppLocalDb.getInstance(getApplication()).clearAllTables()
                 loadedUser = null
                 _loading.postValue(false)
                 _deleteState.postValue(DeleteState.Success)

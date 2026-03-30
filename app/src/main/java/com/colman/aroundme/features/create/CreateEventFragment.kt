@@ -85,10 +85,12 @@ class CreateEventFragment : Fragment() {
         }
     }
 
+    private val navArgs by lazy { CreateEventFragmentArgs.fromBundle(requireArguments()) }
+
     private val eventMode: String
-        get() = arguments?.getString("mode") ?: "create"
+        get() = navArgs.mode
     private val sourceEventId: String?
-        get() = arguments?.getString("eventId")
+        get() = navArgs.eventId.ifBlank { null }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCreateEventBinding.inflate(inflater, container, false)

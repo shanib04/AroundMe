@@ -86,26 +86,24 @@ class MyEventsFragment : Fragment() {
     }
 
     private fun openEditEvent(eventId: String) {
-        val bundle = Bundle().apply {
-            putString("eventId", eventId)
-            putString("mode", "edit")
-        }
-        findNavController().navigate(R.id.createEventFragment, bundle)
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToCreateEventFragment(
+            eventId = eventId,
+            mode = "edit"
+        )
+        findNavController().navigate(action)
     }
 
     private fun openRecreateEvent(eventId: String) {
-        val bundle = Bundle().apply {
-            putString("eventId", eventId)
-            putString("mode", "recreate")
-        }
-        findNavController().navigate(R.id.createEventFragment, bundle)
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToCreateEventFragment(
+            eventId = eventId,
+            mode = "recreate"
+        )
+        findNavController().navigate(action)
     }
 
     private fun openEventDetails(eventId: String) {
-        findNavController().navigate(
-            R.id.eventDetailsFragment,
-            Bundle().apply { putString("eventId", eventId) }
-        )
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToEventDetailsFragment(eventId)
+        findNavController().navigate(action)
     }
 
     private fun confirmDeleteEvent(eventId: String) {
