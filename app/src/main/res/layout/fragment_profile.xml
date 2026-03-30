@@ -561,6 +561,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            app:indicatorColor="@color/map_secondary" />
+            app:indicatorColor="@color/map_secondary"
+            app:trackColor="@color/surface_container_high"
+            app:trackThickness="4dp" />
     </FrameLayout>
 </androidx.constraintlayout.widget.ConstraintLayout>

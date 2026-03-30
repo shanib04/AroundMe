@@ -1,19 +1,28 @@
 package com.colman.aroundme.features.feed
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.colman.aroundme.R
+import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MyEventsFragment : Fragment() {
@@ -37,12 +46,16 @@ class MyEventsFragment : Fragment() {
         )
     }
 
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var locationTokenSource: CancellationTokenSource? = null
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentFeedBinding.inflate(inflater, container, false)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         return binding.root
     }
 
@@ -60,6 +73,31 @@ class MyEventsFragment : Fragment() {
         binding.feedRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.feedRecyclerView.adapter = adapter
 
+        fetchCurrentLocation()
+        observeViewModel()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchCurrentLocation() {
+        val hasFine = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) return
+
+        locationTokenSource?.cancel()
+        val tokenSource = CancellationTokenSource()
+        locationTokenSource = tokenSource
+
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            tokenSource.token
+        ).addOnSuccessListener { location ->
+            if (location != null) {
+                viewModel.updateUserLocation(MapCoordinate(location.latitude, location.longitude))
+            }
+        }
+    }
+
+    private fun observeViewModel() {
         viewModel.events.observe(viewLifecycleOwner) { rows ->
             adapter.submitList(rows)
             val hasEvents = rows.any { it is MyEventRow.EventRow }
@@ -125,6 +163,7 @@ class MyEventsFragment : Fragment() {
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() {
+        locationTokenSource?.cancel()
         binding.feedRecyclerView.adapter = null
         _binding = null
         super.onDestroyView()

@@ -94,4 +94,8 @@
     <!-- Additional Colors -->
     <color name="ds_primary_10">#1AAA2C32</color>
     <color name="rating_yellow">#F0A11D</color>
+
+    <!-- Design-system aliases for M3 spinners -->
+    <color name="primary">@color/primary_coral</color>
+    <color name="surface_container_high">#E1E3E3</color>
 </resources>

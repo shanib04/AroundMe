@@ -583,7 +583,9 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:indeterminate="true"
-            app:indicatorColor="@color/primary_coral" />
+            app:indicatorColor="@color/primary"
+            app:trackColor="@color/surface_container_high"
+            app:trackThickness="4dp" />
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

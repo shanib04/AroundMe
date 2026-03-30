@@ -41,7 +41,7 @@ class LoginViewModel(
                     _loginState.value = AuthResultState.Success(user)
                 }
                 .onFailure {
-                    _loginState.value = AuthResultState.Error(loginFailedMessage)
+                    _loginState.value = AuthResultState.Error(CREDENTIAL_ERROR_MESSAGE)
                 }
         }
     }
@@ -59,10 +59,8 @@ class LoginViewModel(
                     bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
-                .onFailure { throwable ->
-                    _loginState.value = AuthResultState.Error(
-                        throwable.localizedMessage ?: googleLoginFailedMessage
-                    )
+                .onFailure {
+                    _loginState.value = AuthResultState.Error(CREDENTIAL_ERROR_MESSAGE)
                 }
         }
     }
@@ -82,6 +80,10 @@ class LoginViewModel(
     }
 
     private fun getString(resId: Int): String = getApplication<Application>().getString(resId)
+
+    private companion object {
+        const val CREDENTIAL_ERROR_MESSAGE = "Incorrect email/username or password."
+    }
 
     class Factory(
         private val application: Application,

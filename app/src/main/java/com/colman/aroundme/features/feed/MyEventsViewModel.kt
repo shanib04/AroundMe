@@ -41,6 +41,7 @@ class MyEventsViewModel(
     private var usersById: Map<String, User> = emptyMap()
     private var hasLoadedEvents = false
     private var hasLoadedUsers = false
+    private var userLocation = DEFAULT_USER_LOCATION
 
     init {
         _events.addSource(source) { events ->
@@ -92,7 +93,7 @@ class MyEventsViewModel(
             item = EventCardItemMapper.fromEvent(
                 event = event,
                 user = user,
-                distanceLabelText = EventCardItemMapper.distanceLabelText(event, DEFAULT_USER_LOCATION),
+                distanceLabelText = EventCardItemMapper.distanceLabelText(event, userLocation),
                 statusText = EventTextFormatter.statusText(event),
                 postedText = EventTextFormatter.postedTimeText(event.publishTime)
             )
@@ -122,6 +123,11 @@ class MyEventsViewModel(
     fun onDeleteMessageShown() {
         _deleteErrorMessage.value = null
         _deleteSuccessMessage.value = null
+    }
+
+    fun updateUserLocation(location: MapCoordinate) {
+        userLocation = location
+        publishItems()
     }
 
     class Factory(
