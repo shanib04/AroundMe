@@ -150,6 +150,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch(Dispatchers.IO) {
             val localUser = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
             val refreshedUser = userRepo.refreshUserFromRemoteNow(userId)
+            // Ensure events are synced from remote so points calculation has data
+            runCatching { eventRepo.syncFromRemoteNow(0L) }
             val resolvedUser = refreshedUser ?: localUser
             authFallbackUser(resolvedUser)?.let { fallback ->
                 val hasIdentity = fallback.displayName.isNotBlank() || fallback.username.isNotBlank()

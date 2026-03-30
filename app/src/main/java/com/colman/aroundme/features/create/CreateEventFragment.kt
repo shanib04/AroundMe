@@ -128,7 +128,7 @@ class CreateEventFragment : Fragment() {
             )
         }
 
-        if (!sourceEventId.isNullOrBlank()) {
+        if (!sourceEventId.isNullOrBlank() && viewModel.editingEvent.value == null) {
             viewModel.loadEvent(requireNotNull(sourceEventId))
         }
     }

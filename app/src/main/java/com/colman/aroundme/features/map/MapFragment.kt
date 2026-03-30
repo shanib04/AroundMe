@@ -526,10 +526,17 @@ class MapFragment : Fragment() {
     private fun updateMapMarkers(events: List<Event>) {
         val map = googleMap ?: return
 
-        map.clear()
-        activeMarkers.clear()
+        val incomingIds = events.map { it.id }.toSet()
 
+        // Remove markers for events no longer in the list
+        val toRemove = activeMarkers.keys - incomingIds
+        for (id in toRemove) {
+            activeMarkers.remove(id)?.remove()
+        }
+
+        // Add markers only for new events
         for (event in events) {
+            if (activeMarkers.containsKey(event.id)) continue
             val position = LatLng(event.latitude, event.longitude)
             val marker = map.addMarker(
                 MarkerOptions()

@@ -249,6 +249,16 @@ class ProfileFragment : Fragment() {
         val ready = isDataReady && isImageReady
         b.profileLoadingOverlay.isVisible = !ready
         b.scrollContent.isVisible = ready
+        if (ready) {
+            b.progressTrack.post {
+                val percent = viewModel.progressPercent.value ?: 0f
+                val total = b.progressTrack.width - b.progressTrack.paddingLeft - b.progressTrack.paddingRight
+                val fillWidth = (total * percent).toInt()
+                val lp = b.progressFill.layoutParams
+                lp.width = fillWidth
+                b.progressFill.layoutParams = lp
+            }
+        }
     }
 
     private fun bindAchievementPreview(achievements: List<Achievement>) {

@@ -60,8 +60,7 @@ class MyEventsViewModel(
 
     private fun publishItems() {
         prefetchUsers(currentEvents)
-        val isPublisherResolved = currentUserId.isBlank() || !isPublisherUnresolved(currentUserId)
-        if (!hasLoadedEvents || !hasLoadedUsers || (currentEvents.isNotEmpty() && !isPublisherResolved)) {
+        if (!hasLoadedEvents || !hasLoadedUsers) {
             _loading.value = true
             _events.value = emptyList()
             return
@@ -102,11 +101,6 @@ class MyEventsViewModel(
             userRepository.ensureUsersLoaded(publisherIds)
             userRepository.refreshUsersFromRemoteNow(publisherIds)
         }
-    }
-
-    private fun isPublisherUnresolved(userId: String): Boolean {
-        val user = usersById[userId] ?: return true
-        return user.displayName.isBlank() && user.username.isBlank()
     }
 
     fun deleteEvent(eventId: String) {
