@@ -62,14 +62,19 @@ class MyEventsFragment : Fragment() {
 
         viewModel.events.observe(viewLifecycleOwner) { rows ->
             adapter.submitList(rows)
-            binding.emptyText.isVisible = rows.none { it is MyEventRow.EventRow }
-            binding.emptyText.text = getString(R.string.my_events_empty)
+            val hasEvents = rows.any { it is MyEventRow.EventRow }
+            binding.emptyText.isVisible = !hasEvents
+            binding.feedRecyclerView.isVisible = hasEvents
+            if (!hasEvents) {
+                binding.emptyText.text = getString(R.string.my_events_empty)
+            }
         }
 
         viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            val hasEvents = adapter.currentList.any { it is MyEventRow.EventRow }
             binding.initialLoadingContainer.isVisible = loading
-            binding.feedRecyclerView.isVisible = !loading
-            binding.emptyText.isVisible = !loading && adapter.currentList.none { it is MyEventRow.EventRow }
+            binding.feedRecyclerView.isVisible = !loading && hasEvents
+            binding.emptyText.isVisible = !loading && !hasEvents
         }
 
         viewModel.deleteSuccessMessage.observe(viewLifecycleOwner) { message ->

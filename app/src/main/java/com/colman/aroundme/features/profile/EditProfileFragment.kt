@@ -88,8 +88,8 @@ class EditProfileFragment : Fragment() {
                 is EditProfileViewModel.SaveState.Loading -> Unit
                 is EditProfileViewModel.SaveState.Success -> {
                     viewModel.consumeSaveState()
-                    if (_binding == null) return@observe
-                    Snackbar.make(binding.root, state.message ?: getString(R.string.edit_profile_saved), Snackbar.LENGTH_SHORT).show()
+                    if (_binding == null || !isAdded) return@observe
+                    findNavController().navigateUp()
                 }
                 is EditProfileViewModel.SaveState.Error -> {
                     viewModel.consumeSaveState()
