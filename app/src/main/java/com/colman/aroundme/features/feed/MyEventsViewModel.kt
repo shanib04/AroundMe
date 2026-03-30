@@ -7,7 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -20,7 +20,7 @@ sealed interface MyEventRow {
 }
 
 class MyEventsViewModel(
-    repository: EventRepository,
+    private val repository: EventRepository,
     private val userRepository: UserRepository,
     auth: FirebaseAuth = FirebaseAuth.getInstance()
 ) : ViewModel() {
@@ -30,12 +30,22 @@ class MyEventsViewModel(
     private val allUsers = userRepository.observeAll().asLiveData()
     private val _events = MediatorLiveData<List<MyEventRow>>()
     val events: LiveData<List<MyEventRow>> = _events
+    private val _loading = MediatorLiveData(true)
+    val loading: LiveData<Boolean> = _loading
+    private val _deleteErrorMessage = MediatorLiveData<String?>()
+    val deleteErrorMessage: LiveData<String?> = _deleteErrorMessage
+    private val _deleteSuccessMessage = MediatorLiveData<String?>()
+    val deleteSuccessMessage: LiveData<String?> = _deleteSuccessMessage
 
     private var currentEvents: List<Event> = emptyList()
     private var usersById: Map<String, User> = emptyMap()
+    private var hasLoadedEvents = false
+    private var hasLoadedUsers = false
+    private var userLocation = DEFAULT_USER_LOCATION
 
     init {
         _events.addSource(source) { events ->
+            hasLoadedEvents = true
             currentEvents = events.sortedWith(
                 compareBy<Event> { it.isEnded }
                     .thenByDescending { it.publishTime }
@@ -43,13 +53,24 @@ class MyEventsViewModel(
             publishItems()
         }
         _events.addSource(allUsers) { users ->
+            hasLoadedUsers = true
             usersById = users.associateBy { it.id }
             publishItems()
+        }
+        // Ensure events are synced from remote on first load
+        viewModelScope.launch {
+            runCatching { repository.syncFromRemoteNow(0L) }
         }
     }
 
     private fun publishItems() {
         prefetchUsers(currentEvents)
+        if (!hasLoadedEvents || !hasLoadedUsers) {
+            _loading.value = true
+            _events.value = emptyList()
+            return
+        }
+
         val activeEvents = currentEvents.filterNot { it.isEnded }
         val endedEvents = currentEvents.filter { it.isEnded }
         val rows = mutableListOf<MyEventRow>()
@@ -63,6 +84,7 @@ class MyEventsViewModel(
             rows += endedEvents.map(::eventRowFor)
         }
         _events.value = rows
+        _loading.value = false
     }
 
     private fun eventRowFor(event: Event): MyEventRow.EventRow {
@@ -71,7 +93,7 @@ class MyEventsViewModel(
             item = EventCardItemMapper.fromEvent(
                 event = event,
                 user = user,
-                distanceLabelText = EventCardItemMapper.distanceLabelText(event, DEFAULT_USER_LOCATION),
+                distanceLabelText = EventCardItemMapper.distanceLabelText(event, userLocation),
                 statusText = EventTextFormatter.statusText(event),
                 postedText = EventTextFormatter.postedTimeText(event.publishTime)
             )
@@ -82,13 +104,30 @@ class MyEventsViewModel(
         val publisherIds = events.map(Event::publisherId)
         viewModelScope.launch {
             userRepository.ensureUsersLoaded(publisherIds)
+            userRepository.refreshUsersFromRemoteNow(publisherIds)
         }
-        publisherIds.forEach { publisherId ->
-            val user = usersById[publisherId]
-            if (publisherId.isNotBlank() && (user == null || user.displayName.isBlank())) {
-                userRepository.refreshUserFromRemote(publisherId)
+    }
+
+    fun deleteEvent(eventId: String) {
+        viewModelScope.launch {
+            runCatching {
+                repository.deleteEvent(eventId)
+            }.onSuccess {
+                _deleteSuccessMessage.value = "Event deleted"
+            }.onFailure { error ->
+                _deleteErrorMessage.value = error.message ?: "Unable to delete event right now."
             }
         }
+    }
+
+    fun onDeleteMessageShown() {
+        _deleteErrorMessage.value = null
+        _deleteSuccessMessage.value = null
+    }
+
+    fun updateUserLocation(location: MapCoordinate) {
+        userLocation = location
+        publishItems()
     }
 
     class Factory(

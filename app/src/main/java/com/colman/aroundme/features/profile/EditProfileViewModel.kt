@@ -8,16 +8,21 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
+import com.colman.aroundme.R
+import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
 import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
+import com.colman.aroundme.utils.humanizeUsername
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 class EditProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -86,22 +91,29 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun loadUser(userId: String) {
+        // Clear stale data from a previous user session immediately
+        if (loadedUser != null && loadedUser?.id != userId) {
+            loadedUser = null
+            _email.postValue("")
+            _username.postValue("")
+            _displayName.postValue("")
+            _imageUri.postValue(null)
+        }
+
         viewModelScope.launch(Dispatchers.IO) {
+            _loading.postValue(true)
             val localUser = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
-            val resolvedUser = if (localUser == null) {
-                runCatching { userRepo.refreshUserFromRemote(userId) }
-                runCatching { userRepo.getUserById(userId).first() }.getOrNull()
-            } else {
-                localUser
-            } ?: authFallbackUser(userId)
+            val refreshedUser = userRepo.refreshUserFromRemoteNow(userId)
+            val resolvedUser = refreshedUser ?: localUser ?: authFallbackUser(userId)
 
             loadedUser = resolvedUser
             resolvedUser?.let {
                 _email.postValue(it.email)
                 _username.postValue(it.username)
                 _displayName.postValue(it.displayName)
-                _imageUri.postValue(it.profileImageUrl.takeIf(String::isNotBlank)?.toUri())
+                _imageUri.postValue(it.versionedProfileImageUrl().takeIf { value -> value.isNotBlank() }?.toUri())
             }
+            _loading.postValue(false)
         }
     }
 
@@ -145,8 +157,9 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
 
                 val stableEmail = existing?.email?.takeIf { it.isNotBlank() }
                     ?: _email.value.orEmpty()
+                val normalizedUsername = _username.value.orEmpty().trim().lowercase()
                 val updated = (existing ?: User(id = userId, email = stableEmail)).copy(
-                    username = _username.value.orEmpty(),
+                    username = normalizedUsername,
                     displayName = _displayName.value.orEmpty(),
                     profileImageUrl = imageUrl.ifBlank { existing?.profileImageUrl.orEmpty() },
                     email = stableEmail,
@@ -168,7 +181,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
                 _email.postValue(stableEmail)
                 _username.postValue(updated.username)
                 _displayName.postValue(updated.displayName)
-                _imageUri.postValue(updated.profileImageUrl.takeIf(String::isNotBlank)?.toUri())
+                _imageUri.postValue(updated.versionedProfileImageUrl().takeIf { value -> value.isNotBlank() }?.toUri())
 
                 _loading.postValue(false)
                 _uploadProgress.postValue(0)
@@ -213,7 +226,7 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
             try {
                 authRepo.deleteCurrentUserAccountAndData(firebase ?: FirebaseModel.getInstance())
                 eventRepo.deleteEventsByPublisher(userId, removeRemote = false)
-                userRepo.clearAllLocal()
+                AppLocalDb.getInstance(getApplication()).clearAllTables()
                 loadedUser = null
                 _loading.postValue(false)
                 _deleteState.postValue(DeleteState.Success)
@@ -234,16 +247,19 @@ class EditProfileViewModel(application: Application) : AndroidViewModel(applicat
             ?: authUser.email
                 ?.substringBefore('@')
                 ?.trim()
-                ?.lowercase()
+                ?.lowercase(Locale.US)
                 .orEmpty()
-                .ifBlank { "user_${userId.take(6)}" }
+                .take(15)
+                .trim('_')
+                .ifBlank { "explorer_${userId.take(6)}" }
 
         val fallbackDisplayName = loadedUser?.displayName
             ?.takeIf { it.isNotBlank() }
             ?: authUser.displayName
                 ?.trim()
                 .orEmpty()
-                .ifBlank { fallbackUsername }
+                .ifBlank { humanizeUsername(fallbackUsername) }
+                .ifBlank { getApplication<Application>().getString(R.string.default_profile_display_name) }
 
         return User(
             id = userId,

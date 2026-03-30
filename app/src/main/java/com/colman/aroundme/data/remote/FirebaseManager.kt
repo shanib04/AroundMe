@@ -9,7 +9,6 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 
-/// Simple Firebase manager to abstract away direct Firebase calls from repositories
 class FirebaseModel private constructor() {
 
     private val firestore = FirebaseFirestore.getInstance()
@@ -106,18 +105,44 @@ class FirebaseModel private constructor() {
                     "displayName" to user.displayName,
                     "profileImageUrl" to user.profileImageUrl,
                     "email" to user.email,
-                    "achievementHistory" to user.achievementHistory,
                     "discoveryRadiusKm" to user.discoveryRadiusKm,
-                    "points" to user.points,
-                    "eventsPublishedCount" to user.eventsPublishedCount,
-                    "validationsMadeCount" to user.validationsMadeCount,
                     "lastUpdated" to user.lastUpdated
                 ),
                 SetOptions.merge()
             ).await()
     }
 
-    // Check if a username exists in Firestore (excluding a specific userId)
+    suspend fun updateUserAchievements(user: User) {
+        firestore.collection(USERS_COLLECTION).document(user.id)
+            .set(
+                mapOf(
+                    "achievementHistory" to user.achievementHistory,
+                    "lastUpdated" to user.lastUpdated
+                ),
+                SetOptions.merge()
+            ).await()
+    }
+
+    suspend fun updateUserDerivedStats(
+        userId: String,
+        points: Int,
+        eventsPublishedCount: Int,
+        validationsMadeCount: Int,
+        lastUpdated: Long
+    ) {
+        firestore.collection(USERS_COLLECTION).document(userId)
+            .set(
+                mapOf(
+                    "points" to points,
+                    "eventsPublishedCount" to eventsPublishedCount,
+                    "validationsMadeCount" to validationsMadeCount,
+                    "lastUpdated" to lastUpdated
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
     suspend fun isUsernameTaken(username: String, excludingUserId: String? = null): Boolean {
         return try {
             val docs = firestore.collection(USERS_COLLECTION).whereEqualTo("username", username).get().await().documents
@@ -131,7 +156,6 @@ class FirebaseModel private constructor() {
         }
     }
 
-    // Delete a user and all events published by that user from Firestore
     suspend fun deleteUserAndEventsStrict(userId: String) {
         firestore.collection(USERS_COLLECTION).document(userId).delete().await()
         val events = firestore.collection(EVENTS_COLLECTION).whereEqualTo("publisherId", userId).get().await()
@@ -148,16 +172,11 @@ class FirebaseModel private constructor() {
         }
     }
 
-    suspend fun fetchAllUsers(): List<User> {
-        return try {
-            firestore.collection(USERS_COLLECTION)
-                .get()
-                .await()
-                .documents
-                .mapNotNull { it.toObject(User::class.java) }
-        } catch (_: FirebaseFirestoreException) {
-            emptyList()
-        }
+    suspend fun deleteEvent(eventId: String) {
+        firestore.collection(EVENTS_COLLECTION)
+            .document(eventId)
+            .delete()
+            .await()
     }
 
     suspend fun fetchUsersSince(since: Long): List<User> {
@@ -186,6 +205,20 @@ class FirebaseModel private constructor() {
                 .await()
                 .documents
                 .mapNotNull { it.toObject(Event::class.java) }
+        } catch (_: FirebaseFirestoreException) {
+            emptyList()
+        }
+    }
+
+    suspend fun fetchEventsPaginated(pageSize: Int, startAfterTimestamp: Long? = null): List<Event> {
+        return try {
+            var query = firestore.collection(EVENTS_COLLECTION)
+                .orderBy("lastUpdated", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(pageSize.toLong())
+            if (startAfterTimestamp != null) {
+                query = query.startAfter(startAfterTimestamp)
+            }
+            query.get().await().documents.mapNotNull { it.toObject(Event::class.java) }
         } catch (_: FirebaseFirestoreException) {
             emptyList()
         }

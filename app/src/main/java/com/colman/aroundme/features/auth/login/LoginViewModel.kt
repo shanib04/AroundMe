@@ -20,9 +20,7 @@ class LoginViewModel(
     private val userRepository = UserRepository.getInstance(application)
 
     private val credentialsRequiredMessage = getString(R.string.error_login_credentials_required)
-    private val loginFailedMessage = getString(R.string.error_login_failed)
     private val googleTokenMissingMessage = getString(R.string.error_login_google_token_missing)
-    private val googleLoginFailedMessage = getString(R.string.error_login_google_failed)
 
     private val _loginState = MutableLiveData<AuthResultState>(AuthResultState.Idle)
     val loginState: LiveData<AuthResultState> = _loginState
@@ -40,10 +38,8 @@ class LoginViewModel(
                     bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
-                .onFailure { throwable ->
-                    _loginState.value = AuthResultState.Error(
-                        throwable.localizedMessage ?: loginFailedMessage
-                    )
+                .onFailure {
+                    _loginState.value = AuthResultState.Error(CREDENTIAL_ERROR_MESSAGE)
                 }
         }
     }
@@ -61,10 +57,8 @@ class LoginViewModel(
                     bootstrapSignedInUser(user.uid)
                     _loginState.value = AuthResultState.Success(user)
                 }
-                .onFailure { throwable ->
-                    _loginState.value = AuthResultState.Error(
-                        throwable.localizedMessage ?: googleLoginFailedMessage
-                    )
+                .onFailure {
+                    _loginState.value = AuthResultState.Error(CREDENTIAL_ERROR_MESSAGE)
                 }
         }
     }
@@ -84,6 +78,10 @@ class LoginViewModel(
     }
 
     private fun getString(resId: Int): String = getApplication<Application>().getString(resId)
+
+    private companion object {
+        const val CREDENTIAL_ERROR_MESSAGE = "Incorrect email/username or password."
+    }
 
     class Factory(
         private val application: Application,

@@ -1,18 +1,29 @@
 package com.colman.aroundme.features.feed
 
+import android.Manifest
+import android.annotation.SuppressLint
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.colman.aroundme.R
+import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 class MyEventsFragment : Fragment() {
 
@@ -28,10 +39,15 @@ class MyEventsFragment : Fragment() {
 
     private val adapter by lazy {
         MyEventsAdapter(
+            onEventClick = ::openEventDetails,
             onEditClick = ::openEditEvent,
-            onRecreateClick = ::openRecreateEvent
+            onRecreateClick = ::openRecreateEvent,
+            onDeleteClick = ::confirmDeleteEvent
         )
     }
+
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    private var locationTokenSource: CancellationTokenSource? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,6 +55,7 @@ class MyEventsFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentFeedBinding.inflate(inflater, container, false)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity())
         return binding.root
     }
 
@@ -56,32 +73,97 @@ class MyEventsFragment : Fragment() {
         binding.feedRecyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.feedRecyclerView.adapter = adapter
 
+        fetchCurrentLocation()
+        observeViewModel()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun fetchCurrentLocation() {
+        val hasFine = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) return
+
+        locationTokenSource?.cancel()
+        val tokenSource = CancellationTokenSource()
+        locationTokenSource = tokenSource
+
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            tokenSource.token
+        ).addOnSuccessListener { location ->
+            if (location != null) {
+                viewModel.updateUserLocation(MapCoordinate(location.latitude, location.longitude))
+            }
+        }
+    }
+
+    private fun observeViewModel() {
         viewModel.events.observe(viewLifecycleOwner) { rows ->
             adapter.submitList(rows)
-            binding.emptyText.isVisible = rows.none { it is MyEventRow.EventRow }
-            binding.emptyText.text = getString(R.string.my_events_empty)
+            val hasEvents = rows.any { it is MyEventRow.EventRow }
+            binding.emptyText.isVisible = !hasEvents
+            binding.feedRecyclerView.isVisible = hasEvents
+            if (!hasEvents) {
+                binding.emptyText.text = getString(R.string.my_events_empty)
+            }
+        }
+
+        viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            val hasEvents = adapter.currentList.any { it is MyEventRow.EventRow }
+            binding.initialLoadingContainer.isVisible = loading
+            binding.feedRecyclerView.isVisible = !loading && hasEvents
+            binding.emptyText.isVisible = !loading && !hasEvents
+        }
+
+        viewModel.deleteSuccessMessage.observe(viewLifecycleOwner) { message ->
+            if (message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            viewModel.onDeleteMessageShown()
+        }
+
+        viewModel.deleteErrorMessage.observe(viewLifecycleOwner) { message ->
+            if (message.isNullOrBlank()) return@observe
+            Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+            viewModel.onDeleteMessageShown()
         }
     }
 
     private fun openEditEvent(eventId: String) {
-        val bundle = Bundle().apply {
-            putString("eventId", eventId)
-            putString("mode", "edit")
-        }
-        findNavController().navigate(R.id.createEventFragment, bundle)
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToCreateEventFragment(
+            eventId = eventId,
+            mode = "edit"
+        )
+        findNavController().navigate(action)
     }
 
     private fun openRecreateEvent(eventId: String) {
-        val bundle = Bundle().apply {
-            putString("eventId", eventId)
-            putString("mode", "recreate")
-        }
-        findNavController().navigate(R.id.createEventFragment, bundle)
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToCreateEventFragment(
+            eventId = eventId,
+            mode = "recreate"
+        )
+        findNavController().navigate(action)
+    }
+
+    private fun openEventDetails(eventId: String) {
+        val action = MyEventsFragmentDirections.actionMyEventsFragmentToEventDetailsFragment(eventId)
+        findNavController().navigate(action)
+    }
+
+    private fun confirmDeleteEvent(eventId: String) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.my_events_delete_title)
+            .setMessage(R.string.my_events_delete_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.my_events_delete_action) { _, _ ->
+                viewModel.deleteEvent(eventId)
+            }
+            .show()
     }
 
     private fun Int.dpToPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() {
+        locationTokenSource?.cancel()
         binding.feedRecyclerView.adapter = null
         _binding = null
         super.onDestroyView()

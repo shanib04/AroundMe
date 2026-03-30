@@ -10,6 +10,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
+import com.colman.aroundme.data.repository.UserSessionManager
 import com.colman.aroundme.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
@@ -22,6 +23,8 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        UserSessionManager.getInstance(applicationContext).start()
 
         setupEdgeToEdge()
         setupNavigation()
@@ -55,6 +58,8 @@ class MainActivity : AppCompatActivity() {
         // Let NavigationUI handle normal selection for tabs
         binding.bottomNavigationView.setupWithNavController(navController)
 
+        binding.bottomNavigationView.setOnItemReselectedListener {}
+
         binding.fabAdd.setOnClickListener {
             navController.navigate(R.id.createEventFragment)
         }
@@ -81,12 +86,10 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                     R.id.createEventFragment -> {
-                        // FAB-only screen: clear all tab selection
                         for (i in 0 until menu.size()) {
                             menu.getItem(i).isChecked = false
                         }
                     }
-                    // For map/profile, setupWithNavController will handle selection
                 }
             }
         }

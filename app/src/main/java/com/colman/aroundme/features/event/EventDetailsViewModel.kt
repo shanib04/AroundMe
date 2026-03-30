@@ -11,7 +11,6 @@ import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.places.Place
-import com.colman.aroundme.data.repository.EventDetailsRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
@@ -24,7 +23,6 @@ import kotlin.math.roundToInt
 class EventDetailsViewModel(
     private val eventId: String,
     private val eventRepository: EventRepository,
-    private val eventDetailsRepository: EventDetailsRepository,
     private val userRepository: UserRepository,
     private val placesRepository: PlacesRepository,
     private val firebaseModel: FirebaseModel
@@ -44,6 +42,9 @@ class EventDetailsViewModel(
     private val _publisher = MutableLiveData<User?>()
     val publisher: LiveData<User?> = _publisher
 
+    private val _screenLoading = MutableLiveData(true)
+    val screenLoading: LiveData<Boolean> = _screenLoading
+
     private val _isSubmittingVote = MutableLiveData(false)
     val isSubmittingVote: LiveData<Boolean> = _isSubmittingVote
 
@@ -54,7 +55,6 @@ class EventDetailsViewModel(
     val nearbyPlaces: LiveData<List<NearbyPlace>> = _nearbyPlaces
 
     private val _nearbyError = MutableLiveData<String?>(null)
-    val nearbyError: LiveData<String?> = _nearbyError
 
     private val _selectedEssentialsType = MutableLiveData(EssentialsType.PARKING)
     val selectedEssentialsType: LiveData<EssentialsType> = _selectedEssentialsType
@@ -72,33 +72,45 @@ class EventDetailsViewModel(
     val errorMessage: LiveData<String?> = _errorMessage
 
     private var eventJob: Job? = null
+    private var resolvedPublisherId: String? = null
 
     init {
         observeEventRealtime()
         refreshMyInteraction()
+        viewModelScope.launch { eventRepository.refreshEventFromRemote(eventId) }
     }
 
     private fun refreshMyInteraction() {
         viewModelScope.launch {
-            _myRating.value = eventDetailsRepository.fetchMyRating(eventId)
-            _selectedVoteType.value = eventDetailsRepository.fetchMyVote(eventId)
+            val interaction = eventRepository.refreshMyInteraction(eventId)
+            _myRating.value = interaction?.rating?.takeIf { it in 1..5 }
+            _selectedVoteType.value = interaction?.voteType
         }
     }
 
     private fun observeEventRealtime() {
         eventJob?.cancel()
         eventJob = viewModelScope.launch {
-            eventRepository.getEventDetails(eventId).collectLatest { e ->
-                _event.value = e
-                e?.let { ev ->
-                    // Load publisher (Room first, fallback remote)
-                    val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
-                    _publisher.value = roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+            try {
+                eventRepository.getEventDetails(eventId).collectLatest { e ->
+                    _event.value = e
+                    e?.let { ev ->
+                        // Only fetch publisher once (or when publisherId changes)
+                        if (resolvedPublisherId != ev.publisherId) {
+                            resolvedPublisherId = ev.publisherId
+                            val roomUser = userRepository.getUserById(ev.publisherId).firstOrNull()
+                            val refreshedPublisher = userRepository.refreshUserFromRemoteNow(ev.publisherId)
+                            _publisher.value = refreshedPublisher ?: roomUser ?: firebaseModel.fetchUserById(ev.publisherId)
+                        }
+                        _screenLoading.value = false
 
-                    if (ev.latitude != 0.0 && ev.longitude != 0.0) {
-                        loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)
+                        if (ev.latitude != 0.0 && ev.longitude != 0.0) {
+                            loadNearby(_selectedEssentialsType.value ?: EssentialsType.PARKING)
+                        }
                     }
                 }
+            } finally {
+                _screenLoading.value = false
             }
         }
     }
@@ -108,10 +120,10 @@ class EventDetailsViewModel(
         viewModelScope.launch {
             _isSubmittingVote.value = true
             try {
-                _selectedVoteType.value = eventDetailsRepository.submitVote(eventId, voteType)
+                _selectedVoteType.value = eventRepository.submitVote(eventId, voteType)
                 refreshMyInteraction()
-            } catch (_: Exception) {
-                _errorMessage.value = "Unable to save your report right now."
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Unable to save your report right now."
             } finally {
                 _isSubmittingVote.value = false
             }
@@ -131,11 +143,11 @@ class EventDetailsViewModel(
         viewModelScope.launch {
             _isSubmittingRating.value = true
             try {
-                eventDetailsRepository.submitRating(eventId, normalizedRating)
+                eventRepository.submitRating(eventId, normalizedRating)
                 _myRating.value = normalizedRating
                 refreshMyInteraction()
-            } catch (_: Exception) {
-                _errorMessage.value = "Unable to save your rating right now."
+            } catch (e: Exception) {
+                _errorMessage.value = e.message ?: "Unable to save your rating right now."
                 refreshMyInteraction()
             } finally {
                 _isSubmittingRating.value = false
@@ -206,7 +218,6 @@ class EventDetailsViewModel(
     class Factory(
         private val eventId: String,
         private val eventRepository: EventRepository,
-        private val eventDetailsRepository: EventDetailsRepository,
         private val userRepository: UserRepository,
         private val placesRepository: PlacesRepository,
         private val firebaseModel: FirebaseModel
@@ -216,7 +227,6 @@ class EventDetailsViewModel(
             return EventDetailsViewModel(
                 eventId = eventId,
                 eventRepository = eventRepository,
-                eventDetailsRepository = eventDetailsRepository,
                 userRepository = userRepository,
                 placesRepository = placesRepository,
                 firebaseModel = firebaseModel,

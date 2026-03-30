@@ -11,7 +11,7 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.utils.MapCoordinate
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -62,25 +62,6 @@ class StaticMapView @JvmOverloads constructor(
     private var lastTouchX = 0f
     private var lastTouchY = 0f
     private var isPanning = false
-
-    val currentCenter: MapCoordinate
-        get() = searchCenter
-
-    fun updateState(
-        events: List<Event>,
-        searchCenter: MapCoordinate,
-        selectedEventId: String?
-    ) {
-        this.events = events
-        this.searchCenter = searchCenter
-        this.selectedEventId = selectedEventId
-        invalidate()
-    }
-
-    fun animateToCenter(center: MapCoordinate) {
-        searchCenter = center
-        invalidate()
-    }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)

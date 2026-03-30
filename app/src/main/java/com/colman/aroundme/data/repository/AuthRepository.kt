@@ -1,9 +1,9 @@
 package com.colman.aroundme.data.repository
 
 import android.app.Application
-import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import com.colman.aroundme.data.model.User
 import com.colman.aroundme.data.remote.FirebaseModel
 import com.colman.aroundme.data.remote.ProfileImageStoragePath
@@ -16,8 +16,6 @@ import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.tasks.await
-import java.io.File
-import java.io.FileOutputStream
 
 class AuthRepository(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
@@ -28,19 +26,14 @@ class AuthRepository(
     private val achievementRepository by lazy {
         AchievementRepository.getInstance(appContext.applicationContext as Application)
     }
+    private val userRepository by lazy {
+        UserRepository.getInstance(appContext)
+    }
 
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
 
     fun logout() {
         firebaseAuth.signOut()
-    }
-
-    suspend fun loginWithEmailAndPassword(
-        email: String,
-        password: String
-    ): Result<FirebaseUser> = runCatching {
-        val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
-        authResult.user ?: error("Login succeeded, but no user data was returned.")
     }
 
     suspend fun loginWithGoogle(idToken: String): Result<FirebaseUser> = runCatching {
@@ -58,7 +51,9 @@ class AuthRepository(
         password: String,
         imageUri: Uri?
     ): Result<User> = runCatching {
-        val normalizedUsername = username.lowercase()
+        val normalizedUsername = username.trim().lowercase()
+        val normalizedDisplayName = displayName.trim()
+        val normalizedEmail = email.trim()
         val existing = firestore.collection(USERS_COLLECTION)
             .whereEqualTo("username", normalizedUsername)
             .get()
@@ -67,7 +62,7 @@ class AuthRepository(
             error("Username is already taken")
         }
 
-        val authResult = firebaseAuth.createUserWithEmailAndPassword(email, password).await()
+        val authResult = firebaseAuth.createUserWithEmailAndPassword(normalizedEmail, password).await()
         val user = authResult.user ?: error("Registration succeeded, but no user data was returned.")
 
         val persistedImageSource = if (imageUri != null) {
@@ -78,14 +73,14 @@ class AuthRepository(
             ""
         }
 
-        updateFirebaseUserProfile(user, displayName, persistedImageSource)
+        updateFirebaseUserProfile(user, normalizedDisplayName, persistedImageSource)
 
         val userDoc = User(
             id = user.uid,
             username = normalizedUsername,
-            displayName = displayName,
+            displayName = normalizedDisplayName,
             profileImageUrl = persistedImageSource,
-            email = email
+            email = normalizedEmail
         )
 
         firestore.collection(USERS_COLLECTION)
@@ -93,10 +88,10 @@ class AuthRepository(
             .set(userDoc)
             .await()
 
+        userRepository.upsertUser(userDoc, pushToRemote = false)
+
         achievementRepository.unlockFreshFace(user.uid)
-        userDoc.copy(
-            achievementHistory = userRepositorySnapshot(user.uid)?.achievementHistory ?: emptyList()
-        )
+        userRepositorySnapshot(user.uid) ?: userDoc
     }
 
     suspend fun loginWithIdentifierAndPassword(
@@ -108,25 +103,66 @@ class AuthRepository(
             val authResult = firebaseAuth.signInWithEmailAndPassword(trimmed, password).await()
             authResult.user ?: error("Login succeeded, but no user data was returned.")
         } else {
-            val normalizedUsername = trimmed.lowercase()
-            val snapshot = firestore.collection(USERS_COLLECTION)
-                .whereEqualTo("username", normalizedUsername)
-                .get()
-                .await()
-
-            if (snapshot.isEmpty) {
-                error("Username not found")
-            }
-
-            val doc = snapshot.documents.first()
-            val email = doc.getString("email").orEmpty()
-            if (email.isBlank()) {
+            val email = resolveEmailForUsername(trimmed)
+            if (email.isNullOrBlank()) {
                 error("Username not found")
             }
 
             val authResult = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             authResult.user ?: error("Login succeeded, but no user data was returned.")
         }
+    }
+
+    private suspend fun resolveEmailForUsername(username: String): String? {
+        val trimmedUsername = username.trim()
+        if (trimmedUsername.isBlank()) return null
+
+        val candidates = linkedSetOf(trimmedUsername, trimmedUsername.lowercase())
+        candidates.forEach { candidate ->
+            val remoteEmail = runCatching {
+                firestore.collection(USERS_COLLECTION)
+                    .whereEqualTo("username", candidate)
+                    .get()
+                    .await()
+                    .documents
+                    .firstNotNullOfOrNull { document ->
+                        document.getString("email")?.trim()?.takeIf { it.isNotBlank() }
+                    }
+            }.getOrNull()
+            if (!remoteEmail.isNullOrBlank()) {
+                return remoteEmail
+            }
+        }
+
+        val normalizedUsername = trimmedUsername.lowercase()
+        val localUserRepository = UserRepository.getInstance(appContext)
+        candidates.forEach { candidate ->
+            val localEmail = runCatching {
+                localUserRepository.getUserByUsername(candidate)
+                    ?.email
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }.getOrNull()
+            if (!localEmail.isNullOrBlank()) {
+                return localEmail
+            }
+        }
+
+        return runCatching {
+            firestore.collection(USERS_COLLECTION)
+                .get()
+                .await()
+                .documents
+                .firstNotNullOfOrNull { document ->
+                    val storedUsername = document.getString("username")?.trim().orEmpty()
+                    val storedEmail = document.getString("email")?.trim().orEmpty()
+                    if (storedUsername.lowercase() == normalizedUsername && storedEmail.isNotBlank()) {
+                        storedEmail
+                    } else {
+                        null
+                    }
+                }
+        }.getOrNull()
     }
 
     suspend fun signInWithGoogleAndSyncProfile(idToken: String): Result<User> = runCatching {
@@ -177,7 +213,12 @@ class AuthRepository(
         }
 
         if (snapshot.exists()) {
-            return mergeUsers(snapshot.toObject(User::class.java), buildFallbackUser(user, snapshot.getString("profileImageUrl")))
+            val mergedUser = mergeUsers(
+                snapshot.toObject(User::class.java),
+                buildFallbackUser(user, snapshot.getString("profileImageUrl"))
+            )
+            userRepository.upsertUser(mergedUser, pushToRemote = false)
+            return mergedUser
         }
 
         val profile = buildFallbackUser(user)
@@ -186,6 +227,7 @@ class AuthRepository(
                 .document(user.uid)
                 .set(profile)
                 .await()
+            userRepository.upsertUser(profile, pushToRemote = false)
             achievementRepository.unlockFreshFace(user.uid)
             userRepositorySnapshot(user.uid) ?: profile
         } catch (exception: FirebaseFirestoreException) {
@@ -198,29 +240,12 @@ class AuthRepository(
     }
 
     private suspend fun userRepositorySnapshot(userId: String): User? {
-        return UserRepository.getInstance(appContext).getUserById(userId).first()
+        return userRepository.getUserById(userId).first()
     }
 
     private suspend fun FirebaseUser.reloadAndReturnCurrent(): FirebaseUser {
         runCatching { reload().await() }
         return firebaseAuth.currentUser ?: this
-    }
-
-    private fun copyImageToAppStorage(sourceUri: Uri, userId: String): Uri {
-        if (sourceUri.scheme == ContentResolver.SCHEME_FILE) {
-            return sourceUri
-        }
-
-        val inputStream = appContext.contentResolver.openInputStream(sourceUri)
-            ?: error("Unable to open the selected profile image.")
-        val imageFile = File(appContext.cacheDir, "profile_upload_$userId.jpg")
-        inputStream.use { input ->
-            FileOutputStream(imageFile).use { output ->
-                input.copyTo(output)
-                output.flush()
-            }
-        }
-        return Uri.fromFile(imageFile)
     }
 
     private fun buildFallbackUser(user: FirebaseUser, fallbackImageUrl: String? = null): User =
@@ -247,8 +272,6 @@ class AuthRepository(
             validationsMadeCount = primary?.validationsMadeCount ?: fallback.validationsMadeCount,
             lastUpdated = maxOf(primary?.lastUpdated ?: 0L, fallback.lastUpdated)
         )
-
-    private fun String.toUri(): Uri = Uri.parse(this)
 
 
     private companion object {

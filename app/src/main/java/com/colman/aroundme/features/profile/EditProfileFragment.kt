@@ -15,7 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.core.widget.addTextChangedListener
 import androidx.navigation.fragment.findNavController
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.bumptech.glide.Glide
 import com.colman.aroundme.databinding.FragmentEditProfileBinding
 import com.google.android.material.snackbar.Snackbar
@@ -88,8 +88,8 @@ class EditProfileFragment : Fragment() {
                 is EditProfileViewModel.SaveState.Loading -> Unit
                 is EditProfileViewModel.SaveState.Success -> {
                     viewModel.consumeSaveState()
-                    if (_binding == null) return@observe
-                    Snackbar.make(binding.root, state.message ?: getString(R.string.edit_profile_saved), Snackbar.LENGTH_SHORT).show()
+                    if (_binding == null || !isAdded) return@observe
+                    findNavController().navigateUp()
                 }
                 is EditProfileViewModel.SaveState.Error -> {
                     viewModel.consumeSaveState()
@@ -111,7 +111,7 @@ class EditProfileFragment : Fragment() {
                         null,
                         androidx.navigation.NavOptions.Builder()
                             .setLaunchSingleTop(true)
-                            .setPopUpTo(R.id.loginFragment, true)
+                            .setPopUpTo(R.id.nav_graph, true)
                             .build()
                     )
                 }
@@ -174,6 +174,7 @@ class EditProfileFragment : Fragment() {
         }
 
         viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            binding.initialLoadingOverlay.visibility = if (loading) View.VISIBLE else View.GONE
             binding.saveProgress.visibility = if (loading) View.VISIBLE else View.GONE
             binding.saveButton.isEnabled = !loading
             binding.deleteButton.isEnabled = !loading

@@ -10,18 +10,23 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
+import com.colman.aroundme.R
+import com.colman.aroundme.data.local.AppLocalDb
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.repository.AuthRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
+import com.colman.aroundme.utils.humanizeUsername
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 class ProfileViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -38,8 +43,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     private var userObserver: Observer<User?>? = null
     private var eventObserverSource: LiveData<List<Event>>? = null
     private var eventObserver: Observer<List<Event>>? = null
-    private var allUsersObserverSource: LiveData<List<User>>? = null
-    private var allUsersObserver: Observer<List<User>>? = null
 
     private val _imageUri = MutableLiveData<Uri?>(null)
     val imageUri: LiveData<Uri?> = _imageUri
@@ -75,7 +78,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
     val progressText: LiveData<String> = _progressText
 
     private val _achievements = MutableLiveData<List<Achievement>>(emptyList())
-    val achievements: LiveData<List<Achievement>> = _achievements
 
     private val _achievementHistory = MutableLiveData<List<Achievement>>(emptyList())
     val achievementHistory: LiveData<List<Achievement>> = _achievementHistory
@@ -110,10 +112,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             postEmptyProfile()
             return
         }
+        _loading.value = true
         if (currentUserId == userId && userObserverSource != null && eventObserverSource != null) {
             viewModelScope.launch(Dispatchers.IO) {
-                userRepo.refreshUserFromRemote(userId)
+                userRepo.refreshUserFromRemoteNow(userId)
                 computeStatsAndPost(currentEvents, currentUser)
+                _loading.postValue(false)
             }
             return
         }
@@ -125,7 +129,9 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         userObserverSource = userRepo.getUserById(userId).asLiveData().also { source ->
             val observer = Observer<User?> { user ->
                 currentUser = user
-                postUser(user)
+                if (user != null || _loading.value != true) {
+                    postUser(user)
+                }
                 computeStatsAndPost(currentEvents, user)
             }
             userObserver = observer
@@ -143,14 +149,20 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch(Dispatchers.IO) {
             val localUser = runCatching { userRepo.getUserById(userId).first() }.getOrNull()
-            userRepo.refreshUserFromRemote(userId)
-            authFallbackUser(localUser)?.let { fallback ->
+            val refreshedUser = userRepo.refreshUserFromRemoteNow(userId)
+            // Ensure events are synced from remote so points calculation has data
+            runCatching { eventRepo.syncFromRemoteNow(0L) }
+            val resolvedUser = refreshedUser ?: localUser
+            authFallbackUser(resolvedUser)?.let { fallback ->
                 val hasIdentity = fallback.displayName.isNotBlank() || fallback.username.isNotBlank()
-                if (hasIdentity) {
+                if (hasIdentity && refreshedUser == null) {
                     userRepo.upsertUser(fallback, pushToRemote = false)
                 }
+                currentUser = refreshedUser ?: fallback
+                postUser(currentUser)
             }
-            computeStatsAndPost(currentEvents, currentUser)
+            computeStatsAndPost(currentEvents, currentUser ?: resolvedUser)
+            _loading.postValue(false)
         }
     }
 
@@ -180,7 +192,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             try {
                 clearObserversOnMainThread()
                 authRepo.logout()
-                userRepo.clearAllLocal()
+                // Clear ALL Room tables for secure logout
+                AppLocalDb.getInstance(getApplication()).clearAllTables()
                 _logoutState.postValue(LogoutState.Success)
             } catch (e: Exception) {
                 Log.e("ProfileViewModel", "logout failed", e)
@@ -206,8 +219,6 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         userObserver = null
         eventObserverSource = null
         eventObserver = null
-        allUsersObserverSource = null
-        allUsersObserver = null
         currentEvents = emptyList()
         currentUser = null
         knownUsers = emptyList()
@@ -228,13 +239,16 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val fallbackUsername = emailPrefix
             .ifBlank {
                 authDisplayName
-                    .lowercase()
+                    .lowercase(Locale.US)
                     .replace("[^a-z0-9_]+".toRegex(), "_")
                     .trim('_')
             }
-            .ifBlank { "user_${authUser.uid.take(6)}" }
+            .take(15)
+            .trim('_')
+            .ifBlank { "explorer_${authUser.uid.take(6)}" }
         val fallbackDisplayName = authDisplayName
-            .ifBlank { fallbackUsername }
+            .ifBlank { humanizeUsername(fallbackUsername) }
+            .ifBlank { getApplication<Application>().getString(R.string.default_profile_display_name) }
 
         return User(
             id = authUser.uid,
@@ -268,7 +282,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         val profileImageUrl = resolvedUser?.profileImageUrl.orEmpty()
             .ifBlank { authFallbackUser()?.profileImageUrl.orEmpty() }
         if (profileImageUrl.isNotBlank()) {
-            _imageUri.postValue(profileImageUrl.toUri())
+            _imageUri.postValue(resolvedUser?.versionedProfileImageUrl()?.toUri() ?: profileImageUrl.toUri())
         } else {
             _imageUri.postValue(null)
         }
@@ -310,7 +324,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             val realEventCount = events.size
             val safeUser = (user ?: authFallbackUser()) ?: User(id = requestedUserId)
             val realValidations = maxOf(safeUser.validationsMadeCount, derivedValidations)
-            val points = safeUser.points
+            val expectedPoints = (realEventCount * EVENT_CREATED_POINTS) + (realValidations * VALIDATION_POINTS)
+            val points = expectedPoints
             val totalActiveVotes = events.sumOf { it.activeVotes }
             val totalInactiveVotes = events.sumOf { it.inactiveVotes }
             val isReliableContributor = realEventCount > 0 && totalActiveVotes > 0 && totalInactiveVotes == 0
@@ -334,21 +349,33 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
             _achievements.postValue(history.take(3))
 
             val statsChanged = safeUser.eventsPublishedCount != realEventCount ||
-                safeUser.validationsMadeCount != realValidations
+                safeUser.validationsMadeCount != realValidations ||
+                safeUser.points != points
 
             if (safeUser.id.isNotBlank() && statsChanged) {
                 val updatedUser = safeUser.copy(
+                    points = points,
                     eventsPublishedCount = realEventCount,
                     validationsMadeCount = realValidations,
                     lastUpdated = System.currentTimeMillis()
                 )
                 currentUser = updatedUser
-                runCatching { userRepo.updateUserProfile(updatedUser, pushToRemote = true) }
+                runCatching {
+                    userRepo.updateDerivedStats(
+                        userId = updatedUser.id,
+                        eventsPublishedCount = realEventCount,
+                        validationsMadeCount = realValidations,
+                        points = points
+                    )
+                }
             }
         }
     }
 
     companion object {
+        private const val EVENT_CREATED_POINTS = UserRepository.EVENT_CREATED_POINTS_AWARD
+        private const val VALIDATION_POINTS = UserRepository.VALIDATION_POINTS_AWARD
+
         internal data class LevelProgress(
             val level: Int,
             val nextLevel: Int,

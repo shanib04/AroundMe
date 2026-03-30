@@ -16,18 +16,17 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.EventVoteType
 import com.colman.aroundme.data.model.NearbyPlace
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.data.remote.FirebaseModel
-import com.colman.aroundme.data.repository.EventDetailsRepository
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.PlacesRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentEventDetailsBinding
-import java.util.Date
 import java.util.Locale
 
 class EventDetailsFragment : Fragment() {
@@ -42,7 +41,6 @@ class EventDetailsFragment : Fragment() {
         EventDetailsViewModel.Factory(
             eventId = args.eventId,
             eventRepository = EventRepository.getInstance(requireContext()),
-            eventDetailsRepository = EventDetailsRepository.getInstance(),
             userRepository = UserRepository.getInstance(requireContext()),
             placesRepository = PlacesRepository.getInstance(),
             firebaseModel = FirebaseModel.getInstance()
@@ -60,6 +58,7 @@ class EventDetailsFragment : Fragment() {
         get() = binding.root.findViewById(R.id.eventTimeSecondary)
 
     private var suppressRatingListener = false
+    private var lastRenderedPublisherImageUrl: String? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -141,6 +140,11 @@ class EventDetailsFragment : Fragment() {
 
         viewModel.publisher.observe(viewLifecycleOwner) { user ->
             renderPublisher(user)
+        }
+
+        viewModel.screenLoading.observe(viewLifecycleOwner) { loading ->
+            binding.detailsLoadingOverlay.isVisible = loading
+            binding.scrollView.isVisible = !loading
         }
 
         viewModel.selectedVoteType.observe(viewLifecycleOwner) { voteType ->
@@ -234,12 +238,16 @@ class EventDetailsFragment : Fragment() {
         binding.publisherHandle.text = user?.username?.takeIf { it.isNotBlank() }?.let { "@$it" } ?: ""
         binding.publisherHandle.isVisible = !binding.publisherHandle.text.isNullOrBlank()
 
-        Glide.with(this)
-            .load(user?.profileImageUrl?.ifBlank { null })
-            .placeholder(R.drawable.ic_person_placeholder)
-            .error(R.drawable.ic_person_placeholder)
-            .centerCrop()
-            .into(binding.publisherAvatar)
+        val imageUrl = user?.versionedProfileImageUrl()?.ifBlank { null }
+        if (imageUrl != lastRenderedPublisherImageUrl) {
+            lastRenderedPublisherImageUrl = imageUrl
+            Glide.with(this)
+                .load(imageUrl)
+                .placeholder(R.drawable.ic_person_placeholder)
+                .error(R.drawable.ic_person_placeholder)
+                .centerCrop()
+                .into(binding.publisherAvatar)
+        }
     }
 
     private fun renderVoteSelection(selectedVoteType: EventVoteType?) {

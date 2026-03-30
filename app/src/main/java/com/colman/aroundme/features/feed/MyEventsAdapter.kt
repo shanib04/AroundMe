@@ -14,8 +14,10 @@ import com.colman.aroundme.databinding.ViewEventCardBinding
 import com.colman.aroundme.databinding.ViewMyEventsSectionHeaderBinding
 
 class MyEventsAdapter(
+    private val onEventClick: (String) -> Unit,
     private val onEditClick: (String) -> Unit,
-    private val onRecreateClick: (String) -> Unit
+    private val onRecreateClick: (String) -> Unit,
+    private val onDeleteClick: (String) -> Unit
 ) : ListAdapter<MyEventRow, RecyclerView.ViewHolder>(DiffCallback) {
 
     override fun getItemViewType(position: Int): Int {
@@ -33,7 +35,7 @@ class MyEventsAdapter(
             }
             else -> {
                 val binding = ViewEventCardBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-                MyEventViewHolder(binding, onEditClick, onRecreateClick)
+                MyEventViewHolder(binding, onEventClick, onEditClick, onRecreateClick, onDeleteClick)
             }
         }
     }
@@ -55,8 +57,10 @@ class MyEventsAdapter(
 
     class MyEventViewHolder(
         private val binding: ViewEventCardBinding,
+        private val onEventClick: (String) -> Unit,
         private val onEditClick: (String) -> Unit,
-        private val onRecreateClick: (String) -> Unit
+        private val onRecreateClick: (String) -> Unit,
+        private val onDeleteClick: (String) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
 
         fun bind(row: MyEventRow.EventRow) {
@@ -72,6 +76,7 @@ class MyEventsAdapter(
             binding.activeVotesButton.isVisible = false
             binding.inactiveVotesButton.isVisible = false
             binding.ownerActionButton.isVisible = true
+            binding.ownerDeleteButton.isVisible = true
             val isEnded = event.isEnded
             binding.ownerActionButton.text = if (isEnded) {
                 binding.root.context.getString(R.string.my_events_recreate)
@@ -92,6 +97,19 @@ class MyEventsAdapter(
             )
             binding.ownerActionButton.setOnClickListener {
                 if (isEnded) onRecreateClick(event.id) else onEditClick(event.id)
+            }
+            binding.ownerDeleteButton.setOnClickListener {
+                onDeleteClick(event.id)
+            }
+            binding.root.setOnClickListener {
+                if (!isEnded) {
+                    onEventClick(event.id)
+                }
+            }
+            binding.moreButton.setOnClickListener {
+                if (!isEnded) {
+                    onEventClick(event.id)
+                }
             }
 
             applyEndedStyle(isEnded)

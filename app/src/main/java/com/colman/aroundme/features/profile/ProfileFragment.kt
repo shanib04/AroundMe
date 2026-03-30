@@ -1,5 +1,6 @@
 package com.colman.aroundme.features.profile
 
+import android.graphics.drawable.Drawable
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,10 +13,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.load.DataSource
+import com.bumptech.glide.load.engine.GlideException
+import com.bumptech.glide.request.RequestListener
+import com.bumptech.glide.request.target.Target
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.databinding.FragmentProfileBinding
+import com.colman.aroundme.utils.backgroundForAchievement
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import java.text.NumberFormat
@@ -24,6 +29,9 @@ class ProfileFragment : Fragment() {
 
     private var _binding: FragmentProfileBinding? = null
     private val binding get() = requireNotNull(_binding) { "FragmentProfileBinding accessed outside of onCreateView/onDestroyView" }
+
+    private var isDataReady = false
+    private var isImageReady = false
 
     private val viewModel: ProfileViewModel by viewModels {
         ViewModelProvider.AndroidViewModelFactory.getInstance(requireActivity().application)
@@ -114,7 +122,7 @@ class ProfileFragment : Fragment() {
                         null,
                         NavOptions.Builder()
                             .setLaunchSingleTop(true)
-                            .setPopUpTo(R.id.loginFragment, true)
+                            .setPopUpTo(R.id.nav_graph, true)
                             .build()
                     )
                 }
@@ -127,17 +135,46 @@ class ProfileFragment : Fragment() {
 
         viewModel.imageUri.observe(viewLifecycleOwner) { uri ->
             if (uri != null) {
+                isImageReady = false
                 Glide.with(this)
                     .load(uri)
-                    .placeholder(R.drawable.ic_person_placeholder)
-                    .error(R.drawable.ic_person_placeholder)
-                    .diskCacheStrategy(DiskCacheStrategy.NONE)
-                    .skipMemoryCache(true)
                     .circleCrop()
+                    .listener(object : RequestListener<Drawable> {
+                        override fun onLoadFailed(
+                            e: GlideException?,
+                            model: Any?,
+                            target: Target<Drawable>,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+                            isImageReady = true
+                            updateLoadingOverlay()
+                            return true
+                        }
+
+                        override fun onResourceReady(
+                            resource: Drawable,
+                            model: Any,
+                            target: Target<Drawable>?,
+                            dataSource: DataSource,
+                            isFirstResource: Boolean
+                        ): Boolean {
+                            isImageReady = true
+                            updateLoadingOverlay()
+                            return false
+                        }
+                    })
                     .into(profileBinding.profileImageView)
             } else {
                 profileBinding.profileImageView.setImageResource(R.drawable.ic_person_placeholder)
+                isImageReady = true
+                updateLoadingOverlay()
             }
+        }
+
+        viewModel.loading.observe(viewLifecycleOwner) { loading ->
+            isDataReady = !loading
+            updateLoadingOverlay()
         }
 
         viewModel.displayName.observe(viewLifecycleOwner) { displayName ->
@@ -208,6 +245,23 @@ class ProfileFragment : Fragment() {
         }
     }
 
+    private fun updateLoadingOverlay() {
+        val b = _binding ?: return
+        val ready = isDataReady && isImageReady
+        b.profileLoadingOverlay.isVisible = !ready
+        b.scrollContent.isVisible = ready
+        if (ready) {
+            b.progressTrack.post {
+                val percent = viewModel.progressPercent.value ?: 0f
+                val total = b.progressTrack.width - b.progressTrack.paddingLeft - b.progressTrack.paddingRight
+                val fillWidth = (total * percent).toInt()
+                val lp = b.progressFill.layoutParams
+                lp.width = fillWidth
+                b.progressFill.layoutParams = lp
+            }
+        }
+    }
+
     private fun bindAchievementPreview(achievements: List<Achievement>) {
         val binding = _binding ?: return
         val slots = listOf(
@@ -234,26 +288,6 @@ class ProfileFragment : Fragment() {
                 container.isClickable = false
                 container.isFocusable = false
             }
-        }
-    }
-
-    private fun backgroundForAchievement(achievement: Achievement): Int {
-        val name = achievement.name.lowercase()
-        return when {
-            name.contains("rising") ||
-                name.contains("legend") ||
-                name.contains("fresh face") ||
-                name.contains("making waves") -> R.drawable.ach_bg_orange
-
-            name.contains("trustworthy") ||
-                name.contains("oracle") ||
-                name.contains("fact checker") ||
-                name.contains("truth seeker") -> R.drawable.ach_bg_blue
-
-            name.contains("crowd favorite") ||
-                name.contains("crowd pleaser") -> R.drawable.ach_bg_orange
-
-            else -> R.drawable.ach_bg_purple
         }
     }
 

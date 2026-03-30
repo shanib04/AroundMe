@@ -35,10 +35,13 @@
             android:layout_gravity="center"
             android:orientation="vertical"
             android:gravity="center">
-            <ProgressBar
+            <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:indeterminateTint="@color/map_primary" />
+                android:indeterminate="true"
+                app:indicatorColor="@color/map_primary"
+                app:trackColor="@color/surface_container_high"
+                app:trackThickness="4dp" />
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

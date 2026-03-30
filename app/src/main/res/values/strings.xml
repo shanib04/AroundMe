@@ -53,8 +53,8 @@
     <string name="map_location_hint">Search for event or location</string>
     <string name="event_details_not_found">Event not found.</string>
     <string name="map_navigation_unavailable">No navigation app is available on this device.</string>
-    <string name="profile_name_placeholder">Alex Rivera</string>
-    <string name="profile_handle_placeholder">\@alex_r</string>
+    <string name="profile_name_placeholder">AroundMe Explorer</string>
+    <string name="profile_handle_placeholder">\@explorer</string>
     <string name="level_label">LEVEL 5</string>
     <string name="points_word">points</string>
     <string name="current_label">Current</string>
@@ -76,6 +76,10 @@
     <string name="my_events_empty">You haven’t created any events yet.</string>
     <string name="my_events_edit">Edit Event</string>
     <string name="my_events_recreate">Recreate Event</string>
+    <string name="my_events_delete_action">Delete Event</string>
+    <string name="my_events_delete_title">Delete event</string>
+    <string name="my_events_delete_message">This event will be removed from your list and the live feed. Are you sure?</string>
+    <string name="my_events_deleted">Event deleted</string>
     <string name="create_event_title">Create Event</string>
     <string name="event_unknown_location">Unknown location</string>
     <string name="map_showing_events_around_format">Showing events around %1$s</string>
@@ -84,6 +88,7 @@
     <string name="profile_points_summary_default">0 total points</string>
     <string name="profile_completion_default">0%</string>
     <string name="profile_no_posts_message">Start sharing to earn points!</string>
+    <string name="default_profile_display_name">AroundMe Explorer</string>
     <string name="profile_events_label">Events</string>
     <string name="profile_validations_label">Validations</string>
     <string name="delete_profile_label">Delete Profile</string>

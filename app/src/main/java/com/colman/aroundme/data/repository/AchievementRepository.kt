@@ -5,17 +5,19 @@ import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Achievement
 import com.colman.aroundme.data.model.Event
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.data.remote.FirebaseModel
 import kotlinx.coroutines.flow.first
 
 class AchievementRepository private constructor(
     private val application: Application,
     private val userRepository: UserRepository
 ) {
+    private val firebase by lazy { FirebaseModel.getInstance() }
 
     suspend fun unlockFreshFace(userId: String) {
         val normalizedUserId = userId.trim()
         if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
+        val user = loadPersistedUser(normalizedUserId)
         val freshFaceName = application.getString(R.string.achievement_fresh_face)
         if (user.achievementHistory.any { it.name == freshFaceName }) return
 
@@ -29,53 +31,52 @@ class AchievementRepository private constructor(
             )).sortedByDescending { it.unlockedAt },
             lastUpdated = now
         )
-        userRepository.updateUserProfile(updatedUser, pushToRemote = true)
+        userRepository.updateUserAchievements(updatedUser, pushToRemote = true)
     }
 
     suspend fun unlockForCreatedEvent(userId: String) {
-        val normalizedUserId = userId.trim()
-        if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
-        persistAchievements(
-            user = user,
-            eventCount = user.eventsPublishedCount,
-            validationCount = user.validationsMadeCount,
-            points = user.points,
-            eventDrivenAchievements = emptyList(),
-            preserveUpdatedCounts = false,
-            includeFreshFace = false
-        )
+        unlockCountBasedAchievements(userId)
     }
 
     suspend fun unlockForValidation(userId: String) {
-        val normalizedUserId = userId.trim()
-        if (normalizedUserId.isBlank()) return
-        val user = userRepository.getUserById(normalizedUserId).first() ?: User(id = normalizedUserId)
-        persistAchievements(
-            user = user,
-            eventCount = user.eventsPublishedCount,
-            validationCount = user.validationsMadeCount,
-            points = user.points,
-            eventDrivenAchievements = emptyList(),
-            preserveUpdatedCounts = false,
-            includeFreshFace = false
-        )
+        unlockCountBasedAchievements(userId)
     }
 
     suspend fun unlockForPublisherEventState(event: Event) {
         val publisherId = event.publisherId.trim()
         if (publisherId.isBlank()) return
-        val user = userRepository.getUserById(publisherId).first() ?: User(id = publisherId)
-        val eventDrivenAchievements = buildEventDrivenAchievements(event)
+        val user = loadPersistedUser(publisherId)
         persistAchievements(
             user = user,
             eventCount = user.eventsPublishedCount,
             validationCount = user.validationsMadeCount,
             points = user.points,
-            eventDrivenAchievements = eventDrivenAchievements,
-            preserveUpdatedCounts = false,
-            includeFreshFace = false
+            eventDrivenAchievements = buildEventDrivenAchievements(event)
         )
+    }
+
+    private suspend fun unlockCountBasedAchievements(userId: String) {
+        val normalizedUserId = userId.trim()
+        if (normalizedUserId.isBlank()) return
+        val user = loadPersistedUser(normalizedUserId)
+        persistAchievements(
+            user = user,
+            eventCount = user.eventsPublishedCount,
+            validationCount = user.validationsMadeCount,
+            points = user.points,
+            eventDrivenAchievements = emptyList()
+        )
+    }
+
+    private suspend fun loadPersistedUser(userId: String): User {
+        userRepository.getUserById(userId).first()?.let { return it }
+
+        runCatching { firebase.fetchUserById(userId) }.getOrNull()?.let { remoteUser ->
+            userRepository.upsertUser(remoteUser, pushToRemote = false)
+            return remoteUser
+        }
+
+        return User(id = userId)
     }
 
     private suspend fun persistAchievements(
@@ -83,9 +84,7 @@ class AchievementRepository private constructor(
         eventCount: Int,
         validationCount: Int,
         points: Int,
-        eventDrivenAchievements: List<Achievement>,
-        preserveUpdatedCounts: Boolean,
-        includeFreshFace: Boolean
+        eventDrivenAchievements: List<Achievement>
     ) {
         val existingHistory = user.achievementHistory
         val existingNames = existingHistory.mapTo(linkedSetOf()) { it.name }
@@ -97,14 +96,6 @@ class AchievementRepository private constructor(
             }
         }
 
-        if (includeFreshFace) {
-            maybeAdd(
-                application.getString(R.string.achievement_fresh_face),
-                "🐣",
-                application.getString(R.string.achievement_fresh_face_description),
-                true
-            )
-        }
         maybeAdd(
             application.getString(R.string.achievement_first_event),
             "🎈",
@@ -166,7 +157,7 @@ class AchievementRepository private constructor(
             }
         }
 
-        if (unlocked.isEmpty() && !preserveUpdatedCounts) return
+        if (unlocked.isEmpty()) return
 
         val now = System.currentTimeMillis()
         val mergedHistory = (existingHistory + unlocked.map { it.copy(unlockedAt = now) })
@@ -174,55 +165,42 @@ class AchievementRepository private constructor(
             .values
             .sortedByDescending { it.unlockedAt }
 
-        val updatedUser = if (preserveUpdatedCounts) {
-            user.copy(
-                achievementHistory = mergedHistory,
-                points = points,
-                eventsPublishedCount = eventCount,
-                validationsMadeCount = validationCount,
-                lastUpdated = now
-            )
-        } else {
-            user.copy(
-                achievementHistory = mergedHistory,
-                lastUpdated = now
-            )
-        }
-
-        userRepository.updateUserProfile(updatedUser, pushToRemote = true)
+        val updatedUser = user.copy(
+            achievementHistory = mergedHistory,
+            lastUpdated = now
+        )
+        userRepository.updateUserAchievements(updatedUser, pushToRemote = true)
     }
 
-    private fun buildEventDrivenAchievements(event: Event): List<Achievement> {
-        val achievements = mutableListOf<Achievement>()
+    private fun buildEventDrivenAchievements(event: Event): List<Achievement> = buildList {
         if (event.activeVotes >= 10) {
-            achievements += Achievement(
+            add(Achievement(
                 name = application.getString(R.string.achievement_crowd_favorite),
                 icon = "🌟",
                 description = application.getString(R.string.achievement_crowd_favorite_description)
-            )
+            ))
         }
         if (event.activeVotes >= 25) {
-            achievements += Achievement(
+            add(Achievement(
                 name = application.getString(R.string.achievement_crowd_pleaser),
                 icon = "🔥",
                 description = application.getString(R.string.achievement_crowd_pleaser_description)
-            )
+            ))
         }
         if (event.activeVotes > event.inactiveVotes && event.activeVotes > 0) {
-            achievements += Achievement(
+            add(Achievement(
                 name = application.getString(R.string.achievement_verified_source),
                 icon = "📡",
                 description = application.getString(R.string.achievement_verified_source_description)
-            )
+            ))
         }
         if (event.ratingCount >= 3 && event.averageRating > 4.5) {
-            achievements += Achievement(
+            add(Achievement(
                 name = application.getString(R.string.achievement_gold_standard),
                 icon = "🥇",
                 description = application.getString(R.string.achievement_gold_standard_description)
-            )
+            ))
         }
-        return achievements
     }
 
     companion object {

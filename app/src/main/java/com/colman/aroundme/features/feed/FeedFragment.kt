@@ -14,11 +14,14 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.colman.aroundme.R
-import com.colman.aroundme.data.model.MapCoordinate
+import com.colman.aroundme.utils.MapCoordinate
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.data.repository.UserRepository
 import com.colman.aroundme.databinding.FragmentFeedBinding
@@ -26,6 +29,7 @@ import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 class FeedFragment : Fragment() {
@@ -77,7 +81,7 @@ class FeedFragment : Fragment() {
     }
 
     private var lastHandledScrollToTopToken: Long = 0L
-    private var selectedSortOption: FeedSortOption = FeedSortOption.NEWEST
+    private var selectedSortOption: SortType = SortType.Distance
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -107,31 +111,32 @@ class FeedFragment : Fragment() {
     }
 
     private fun setupSortDropdown() {
-        val options = FeedSortOption.entries.map { it.label }
+        val options = SortType.entries.map { it.label }
         val adapter = ArrayAdapter(requireContext(), R.layout.item_dropdown_option, options)
         binding.sortDropdown.setAdapter(adapter)
         binding.sortDropdown.setText(selectedSortOption.label, false)
         binding.sortDropdown.setOnItemClickListener { _, _, position, _ ->
-            selectedSortOption = FeedSortOption.entries[position]
-            viewModel.setSortOption(selectedSortOption)
+            selectedSortOption = SortType.entries[position]
+            viewModel.setSortType(selectedSortOption)
         }
     }
 
     private fun observeViewModel() {
-        viewModel.uiState.observe(viewLifecycleOwner) { state ->
-            // If fragment view is already destroyed, ignore emissions.
-            if (_binding == null) return@observe
-
-            render(state)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state ->
+                    render(state)
+                }
+            }
         }
     }
 
     private fun render(state: FeedUiState) {
         if (_binding == null) return
 
-        if (selectedSortOption != state.sortOption) {
-            selectedSortOption = state.sortOption
-            binding.sortDropdown.setText(state.sortOption.label, false)
+        if (selectedSortOption != state.sortType) {
+            selectedSortOption = state.sortType
+            binding.sortDropdown.setText(state.sortType.label, false)
         }
 
         eventAdapter.submitList(state.items) {
@@ -140,10 +145,11 @@ class FeedFragment : Fragment() {
                 binding.feedRecyclerView.scrollToPosition(0)
             }
         }
+        binding.initialLoadingContainer.isVisible = state.isInitialLoading
         binding.loadingMoreIndicator.isVisible = state.isLoadingMore && state.items.isNotEmpty()
-        binding.emptyText.isVisible = state.items.isEmpty()
+        binding.emptyText.isVisible = state.items.isEmpty() && !state.isInitialLoading
         binding.emptyText.text = state.emptyMessage
-        binding.feedRecyclerView.isVisible = state.items.isNotEmpty()
+        binding.feedRecyclerView.isVisible = state.items.isNotEmpty() && !state.isInitialLoading
     }
 
     private fun requestLocationForDistance() {

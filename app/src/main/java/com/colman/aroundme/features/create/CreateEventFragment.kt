@@ -20,16 +20,19 @@ import androidx.core.content.FileProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.navigation.NavOptions
 import androidx.navigation.fragment.findNavController
 import com.bumptech.glide.Glide
 import com.colman.aroundme.R
-import com.colman.aroundme.core.time.IsraelTime
+import com.colman.aroundme.utils.IsraelTime
 import com.colman.aroundme.data.repository.EventRepository
 import com.colman.aroundme.databinding.FragmentCreateEventBinding
 import com.firebase.geofire.GeoFireUtils
 import com.firebase.geofire.GeoLocation
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import java.io.File
 import java.util.Calendar
 import java.util.Locale
@@ -84,10 +87,12 @@ class CreateEventFragment : Fragment() {
         }
     }
 
+    private val navArgs by lazy { CreateEventFragmentArgs.fromBundle(requireArguments()) }
+
     private val eventMode: String
-        get() = arguments?.getString("mode") ?: "create"
+        get() = navArgs.mode
     private val sourceEventId: String?
-        get() = arguments?.getString("eventId")
+        get() = navArgs.eventId.ifBlank { null }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentCreateEventBinding.inflate(inflater, container, false)
@@ -125,7 +130,7 @@ class CreateEventFragment : Fragment() {
             )
         }
 
-        if (!sourceEventId.isNullOrBlank()) {
+        if (!sourceEventId.isNullOrBlank() && viewModel.editingEvent.value == null) {
             viewModel.loadEvent(requireNotNull(sourceEventId))
         }
     }
@@ -303,7 +308,7 @@ class CreateEventFragment : Fragment() {
             } ?: run {
                 Toast.makeText(context, "Unable to open camera", Toast.LENGTH_SHORT).show()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(context, "Error creating image file", Toast.LENGTH_SHORT).show()
         }
     }
@@ -408,7 +413,11 @@ class CreateEventFragment : Fragment() {
                 is CreateEventUiState.Success -> {
                     binding.loadingOverlay.isVisible = false
                     Toast.makeText(context, "Event created successfully!", Toast.LENGTH_SHORT).show()
-                    findNavController().popBackStack()
+                    if (eventMode == "edit") {
+                        findNavController().popBackStack()
+                    } else {
+                        openEventDetails(state.eventId)
+                    }
                 }
                 is CreateEventUiState.Error -> {
                     binding.loadingOverlay.isVisible = false
@@ -460,6 +469,17 @@ class CreateEventFragment : Fragment() {
         return viewModel.selectedImageUri.value != null || !viewModel.editingEvent.value?.imageUrl.isNullOrBlank()
     }
 
+    private fun openEventDetails(eventId: String) {
+        val navController = findNavController()
+        navController.navigate(
+            R.id.eventDetailsFragment,
+            Bundle().apply { putString("eventId", eventId) },
+            NavOptions.Builder()
+                .setPopUpTo(R.id.createEventFragment, true)
+                .build()
+        )
+    }
+
     private fun renderEventImage(selectedUri: Uri?, existingImageUrl: String?) {
         when {
             selectedUri != null -> {
@@ -494,10 +514,13 @@ class CreateEventFragment : Fragment() {
     }
 
     @SuppressLint("MissingPermission")
-    @Suppress("DEPRECATION")
     private fun getCurrentLocation() {
         binding.tvLocationName.text = "Getting location..."
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+        val cancellationTokenSource = CancellationTokenSource()
+        fusedLocationClient.getCurrentLocation(
+            Priority.PRIORITY_HIGH_ACCURACY,
+            cancellationTokenSource.token
+        ).addOnSuccessListener { location ->
             if (location != null) {
                 selectedLatitude = location.latitude
                 selectedLongitude = location.longitude
@@ -516,7 +539,7 @@ class CreateEventFragment : Fragment() {
                         selectedLocationName = "Current Location"
                         binding.tvLocationName.text = selectedLocationName
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     selectedLocationName = "Current Location"
                     binding.tvLocationName.text = selectedLocationName
                 }

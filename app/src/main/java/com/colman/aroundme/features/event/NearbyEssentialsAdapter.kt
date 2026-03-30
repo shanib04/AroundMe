@@ -14,7 +14,6 @@ class NearbyEssentialsAdapter(
     private val onClick: (NearbyPlace) -> Unit
 ) : ListAdapter<NearbyPlace, NearbyEssentialsAdapter.PlaceViewHolder>(Diff) {
 
-    /** The currently selected type so we can show a consistent fallback icon. */
     var fallbackType: EventDetailsViewModel.EssentialsType = EventDetailsViewModel.EssentialsType.PARKING
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PlaceViewHolder {
@@ -45,7 +44,6 @@ class NearbyEssentialsAdapter(
                 EventDetailsViewModel.EssentialsType.GAS -> R.drawable.ic_gas
             }
 
-            // Prefer photoUrl if we have it, otherwise show a crisp local icon.
             val photoUrl = place.photoUrl?.takeIf { it.isNotBlank() }
 
             Glide.with(binding.placeImage)

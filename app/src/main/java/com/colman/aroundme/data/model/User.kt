@@ -17,3 +17,10 @@ data class User(
     val validationsMadeCount: Int = 0,
     val lastUpdated: Long = System.currentTimeMillis() // For Room Sync
 )
+
+fun User.versionedProfileImageUrl(): String {
+    if (profileImageUrl.isBlank()) return ""
+    val separator = if (profileImageUrl.contains('?')) '&' else '?'
+    val version = lastUpdated.coerceAtLeast(0L)
+    return "$profileImageUrl${separator}v=$version"
+}

@@ -3,17 +3,13 @@ package com.colman.aroundme.features.feed
 import androidx.core.view.isVisible
 import com.colman.aroundme.R
 import com.colman.aroundme.data.model.Event
-import com.colman.aroundme.data.model.MapCoordinate
 import com.colman.aroundme.data.model.User
+import com.colman.aroundme.utils.MapCoordinate
+import com.colman.aroundme.utils.distanceKm
+import com.colman.aroundme.data.model.versionedProfileImageUrl
 import com.colman.aroundme.databinding.ViewEventCardBinding
-import com.squareup.picasso.MemoryPolicy
-import com.squareup.picasso.NetworkPolicy
 import com.squareup.picasso.Picasso
 import java.util.Locale
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 data class EventCardItem(
     val event: Event,
@@ -70,8 +66,6 @@ data class EventCardItem(
             .load(hostAvatarUrl)
             .placeholder(R.drawable.ic_person_placeholder)
             .error(R.drawable.ic_person_placeholder)
-            .memoryPolicy(MemoryPolicy.NO_CACHE, MemoryPolicy.NO_STORE)
-            .networkPolicy(NetworkPolicy.NO_CACHE)
             .fit()
             .centerCrop()
             .into(binding.hostAvatarImageView)
@@ -106,7 +100,7 @@ object EventCardItemMapper {
             event = event,
             hostName = user?.displayName?.takeIf { it.isNotBlank() } ?: EventTextFormatter.unknownPublisherText(),
             hostSubtitle = event.category.ifBlank { EventTextFormatter.eventHostFallbackText() },
-            hostAvatarUrl = user?.profileImageUrl.orEmpty(),
+            hostAvatarUrl = user?.versionedProfileImageUrl().orEmpty(),
             locationText = event.locationName.ifBlank { EventTextFormatter.unknownLocationText() },
             distanceLabelText = distanceLabelText,
             statusText = statusText,
@@ -120,19 +114,6 @@ object EventCardItemMapper {
 
     fun distanceLabelText(event: Event, origin: MapCoordinate): String {
         return formatDistance(distanceKm(origin, MapCoordinate(event.latitude, event.longitude)))
-    }
-
-    private fun distanceKm(start: MapCoordinate, end: MapCoordinate): Double {
-        val earthRadiusKm = 6371.0
-        val dLat = Math.toRadians(end.latitude - start.latitude)
-        val dLon = Math.toRadians(end.longitude - start.longitude)
-        val lat1 = Math.toRadians(start.latitude)
-        val lat2 = Math.toRadians(end.latitude)
-
-        val a = sin(dLat / 2) * sin(dLat / 2) +
-            sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2)
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadiusKm * c
     }
 
     private fun formatDistance(distanceKm: Double): String {

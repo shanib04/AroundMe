@@ -65,6 +65,14 @@
         android:id="@+id/createEventFragment"
         android:name="com.colman.aroundme.features.create.CreateEventFragment"
         android:label="Create Event">
+        <argument
+            android:name="eventId"
+            android:defaultValue=""
+            app:argType="string" />
+        <argument
+            android:name="mode"
+            android:defaultValue="create"
+            app:argType="string" />
         <action
             android:id="@+id/action_createEventFragment_to_locationPickerFragment"
             app:destination="@id/locationPickerFragment" />
@@ -100,6 +108,13 @@
     <fragment
         android:id="@+id/myEventsFragment"
         android:name="com.colman.aroundme.features.feed.MyEventsFragment"
-        android:label="My Events" />
+        android:label="My Events">
+        <action
+            android:id="@+id/action_myEventsFragment_to_createEventFragment"
+            app:destination="@id/createEventFragment" />
+        <action
+            android:id="@+id/action_myEventsFragment_to_eventDetailsFragment"
+            app:destination="@id/eventDetailsFragment" />
+    </fragment>
 
 </navigation>

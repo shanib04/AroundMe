@@ -27,14 +27,6 @@ object EventTextFormatter {
         }
     }
 
-    fun ratingSummaryText(event: Event): String {
-        return if (event.ratingCount <= 0) {
-            NO_RATINGS_YET
-        } else {
-            String.format(Locale.US, "%.1f average • %d ratings", event.averageRating, event.ratingCount)
-        }
-    }
-
     fun compactRatingText(event: Event): String {
         return if (event.ratingCount <= 0) {
             NO_RATINGS_YET

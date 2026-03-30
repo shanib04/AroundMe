@@ -23,12 +23,12 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 
 class LoginFragment : Fragment() {
 
     private var _binding: FragmentLoginBinding? = null
-    private val binding get() = requireNotNull(_binding) { "FragmentLoginBinding accessed outside of onCreateView/onDestroyView" }
 
     private val viewModel: LoginViewModel by viewModels {
         LoginViewModel.Factory(requireActivity().application)
@@ -53,6 +53,12 @@ class LoginFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (FirebaseAuth.getInstance().currentUser != null) {
+            navigateToHome()
+            return
+        }
+
         setupUi()
         observeViewModel()
     }
